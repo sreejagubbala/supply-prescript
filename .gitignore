@@ -15,14 +15,8 @@ frontend/.vite/
 
 # Python
 __pycache__/
-*.py[cod]
-.venv/
-venv/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
+data/raw/
+data/processed/
+*.csv
+*.xlsx
+.env
