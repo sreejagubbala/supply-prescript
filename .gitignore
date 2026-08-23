@@ -1,6 +1,28 @@
-.venv/
-__pycache__/
-data/raw/
-*.csv
-*.xlsx
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite
+frontend/dist/
+frontend/.vite/
+
+# Environment
 .env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
