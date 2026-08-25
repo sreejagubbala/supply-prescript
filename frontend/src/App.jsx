@@ -1,8 +1,11 @@
-import React from "react";
-import DecisionROI from "./pages/DecisionROI";
-
 function App() {
-    return <DecisionROI />;
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <h1 className="text-4xl font-bold text-purple-400">
+        Tailwind is working! 🎉
+      </h1>
+    </div>
+  )
 }
 
-export default App;
+export default App
