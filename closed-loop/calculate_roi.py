@@ -1,55 +1,212 @@
+from pathlib import Path
 
-from performance_metrics import calculate_cost_savings
+import pandas as pd
 
-def calculate_savings(expected_cost, actual_cost):
-    """
-    Calculate savings from a decision.
+from performance_metrics import (
+    calculate_metrics,
+    metrics_by_action,
+    metrics_by_shipping_mode,
+    metrics_by_market,
+    metrics_by_region,
+)
 
-    Formula:
-        Expected Cost - Actual Cost
-    """
-    return calculate_cost_savings(expected_cost, actual_cost)
+
+# ============================================================
+# Project paths
+# ============================================================
+
+PROJECT_ROOT = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
+)
+
+DATA_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "sample"
+    / "decision_outcomes.csv"
+)
 
 
-def calculate_roi(expected_cost, actual_cost):
-    """
-    Calculate ROI percentage.
+# ============================================================
+# Load data
+# ============================================================
 
-    Formula:
-        ROI = (Savings / Expected Cost) * 100
-    """
-    if expected_cost < 0:
-        raise ValueError("Expected cost cannot be negative")
+def load_data() -> pd.DataFrame:
 
-    if actual_cost < 0:
-        raise ValueError("Actual cost cannot be negative")
+    if not DATA_FILE.exists():
+        raise FileNotFoundError(
+            f"Decision/outcome file not found:\n"
+            f"{DATA_FILE}\n\n"
+            "Run evaluate_outcome.py first."
+        )
+
+    return pd.read_csv(
+        DATA_FILE
+    )
+
+
+# ============================================================
+# Calculate ROI
+# ============================================================
+
+def calculate_roi(
+    df: pd.DataFrame,
+) -> dict:
+
+    metrics = calculate_metrics(
+        df
+    )
+
+    expected_cost = metrics[
+        "total_expected_cost"
+    ]
+
+    cost_saving = metrics[
+        "total_cost_saving"
+    ]
 
     if expected_cost == 0:
-        return 0.0
+        roi = 0.0
+    else:
+        roi = (
+            cost_saving
+            / expected_cost
+            * 100
+        )
 
-    savings = expected_cost - actual_cost
+    metrics["roi_percentage"] = round(
+        roi,
+        2,
+    )
 
-    return (savings / expected_cost) * 100
-
-
-def calculate_roi_details(expected_cost, actual_cost):
-    """
-    Return complete ROI information.
-    """
-    savings = calculate_savings(expected_cost, actual_cost)
-    roi = calculate_roi(expected_cost, actual_cost)
-    return {
-        "expected_cost": expected_cost,
-        "actual_cost": actual_cost,
-        "savings": savings,
-        "roi_percentage": roi
-    }
+    return metrics
 
 
-def calculate_average_roi(roi_values):
-    """
-    Calculate average ROI from multiple decisions.
-    """
-    if not roi_values:
-        return 0.0
-    return sum(roi_values) / len(roi_values)
+# ============================================================
+# Print section
+# ============================================================
+
+def print_section(
+    title: str,
+) -> None:
+
+    print()
+    print("=" * 65)
+    print(title)
+    print("=" * 65)
+
+
+# ============================================================
+# Main
+# ============================================================
+
+if __name__ == "__main__":
+
+    df = load_data()
+
+    overall = calculate_roi(
+        df
+    )
+
+    action_results = (
+        metrics_by_action(df)
+    )
+
+    shipping_results = (
+        metrics_by_shipping_mode(df)
+    )
+
+    market_results = (
+        metrics_by_market(df)
+    )
+
+    region_results = (
+        metrics_by_region(df)
+    )
+
+    # --------------------------------------------------------
+    # Overall
+    # --------------------------------------------------------
+
+    print_section(
+        "SUPPLY PRESCRIPT - DAY 6 INITIAL ANALYTICS"
+    )
+
+    print(
+        "\nOVERALL KPIs"
+    )
+
+    print(
+        "-" * 65
+    )
+
+    for key, value in overall.items():
+
+        readable_key = (
+            key
+            .replace("_", " ")
+            .title()
+        )
+
+        print(
+            f"{readable_key}: {value}"
+        )
+
+    # --------------------------------------------------------
+    # Action
+    # --------------------------------------------------------
+
+    print_section(
+        "PERFORMANCE BY RECOMMENDED ACTION"
+    )
+
+    print(
+        action_results.to_string(
+            index=False
+        )
+    )
+
+    # --------------------------------------------------------
+    # Shipping mode
+    # --------------------------------------------------------
+
+    print_section(
+        "PERFORMANCE BY SHIPPING MODE"
+    )
+
+    print(
+        shipping_results.to_string(
+            index=False
+        )
+    )
+
+    # --------------------------------------------------------
+    # Market
+    # --------------------------------------------------------
+
+    print_section(
+        "PERFORMANCE BY MARKET"
+    )
+
+    print(
+        market_results.to_string(
+            index=False
+        )
+    )
+
+    # --------------------------------------------------------
+    # Region
+    # --------------------------------------------------------
+
+    print_section(
+        "PERFORMANCE BY ORDER REGION"
+    )
+
+    print(
+        region_results.to_string(
+            index=False
+        )
+    )
