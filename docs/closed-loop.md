@@ -1,5 +1,4 @@
 # Closed-Loop Analytics
-# Closed-Loop Analytics
 
 ## 1. Objective
 
@@ -150,7 +149,7 @@ The ROI dashboard will display:
 
 ---
 
-## 10. Closed-Loop Goal
+## 10. Closed-Loop Goal and Week 1 Work
 
 The goal is to continuously compare:
 
@@ -159,4 +158,18 @@ Expected Outcome vs Actual Outcome
 The comparison helps determine whether the recommendation was
 successful and provides analytics that can be used for future
 decision-making.
+
+This file documents the Closed-Loop Analytics work completed during Week 1 of the Supply Prescript project.
+
+It covers:
+
+Day 1: Define ROI and outcome metrics
+Day 2: Design decision/outcome schema
+Day 3: Analytics and KPI development
+Day 4: Design ROI Dashboard
+Day 5: Prepare sample Decision/ outcome data
+Day 6: Create initial analytics calculations
+Day 7: Week 1 integration review
+
+It also records the Week 1 deliverables, integration testing, issues found, and improvements planned for Week 2.
 
