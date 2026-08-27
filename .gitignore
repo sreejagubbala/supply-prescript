@@ -44,3 +44,4 @@ data/processed/
 *.csv
 *.xlsx
 .env
+ml-model/models/*.pkl
