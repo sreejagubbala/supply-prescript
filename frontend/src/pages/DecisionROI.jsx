@@ -1,414 +1,493 @@
-import React from "react";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
+import KPICard from "../components/KPICard";
+import ChartCard from "../components/ChartCard";
 
 
-const roiSummary = {
-    totalSavings: 125000,
-    totalDecisions: 120,
-    averageROI: 18.5,
-    successRate: 82
-};
-
+// ============================================================
+// SAMPLE DASHBOARD DATA
+// ============================================================
 
 const costData = [
-    {
-        month: "Jan",
-        expected: 100000,
-        actual: 92000
-    },
-    {
-        month: "Feb",
-        expected: 120000,
-        actual: 105000
-    },
-    {
-        month: "Mar",
-        expected: 110000,
-        actual: 97000
-    },
-    {
-        month: "Apr",
-        expected: 135000,
-        actual: 112000
-    },
-    {
-        month: "May",
-        expected: 150000,
-        actual: 125000
-    }
+  {
+    name: "Expected",
+    cost: 12500,
+  },
+  {
+    name: "Actual",
+    cost: 10150,
+  },
 ];
 
 
-const roiData = [
-    {
-        month: "Jan",
-        roi: 8
-    },
-    {
-        month: "Feb",
-        roi: 12
-    },
-    {
-        month: "Mar",
-        roi: 15
-    },
-    {
-        month: "Apr",
-        roi: 19
-    },
-    {
-        month: "May",
-        roi: 24
-    }
+const deliveryData = [
+  {
+    name: "On Time",
+    value: 75,
+  },
+  {
+    name: "Delayed",
+    value: 25,
+  },
 ];
 
+
+const actionData = [
+  {
+    action: "Upgrade Shipping",
+    successRate: 82,
+    savings: 1450,
+  },
+  {
+    action: "Prioritize",
+    successRate: 76,
+    savings: 1180,
+  },
+  {
+    action: "Split Shipment",
+    successRate: 70,
+    savings: 920,
+  },
+];
+
+
+const shippingModeData = [
+  {
+    mode: "Standard Class",
+    savings: 980,
+  },
+  {
+    mode: "Second Class",
+    savings: 620,
+  },
+  {
+    mode: "First Class",
+    savings: 450,
+  },
+  {
+    mode: "Same Day",
+    savings: 300,
+  },
+];
+
+
+const marketData = [
+  {
+    market: "Pacific Asia",
+    savings: 620,
+  },
+  {
+    market: "Europe",
+    savings: 540,
+  },
+  {
+    market: "USCA",
+    savings: 480,
+  },
+  {
+    market: "LATAM",
+    savings: 390,
+  },
+  {
+    market: "Africa",
+    savings: 280,
+  },
+];
+
+
+// ============================================================
+// ROI DASHBOARD
+// ============================================================
 
 function DecisionROI() {
+  return (
+    <div className="roi-page">
 
-    return (
-        <div className="roi-page">
+      {/* ================================================== */}
+      {/* PAGE HEADER */}
+      {/* ================================================== */}
 
-            {/* Header */}
+      <div className="roi-header">
 
-            <div className="roi-header">
+        <div>
+          <h1>
+            Decision ROI
+          </h1>
 
-                <div>
-                    <h1>Decision ROI</h1>
+          <p>
+            Closed-loop performance and prescription impact
+          </p>
+        </div>
 
-                    <p>
-                        Monitor the financial impact and
-                        effectiveness of supply-chain decisions.
-                    </p>
-                </div>
+        <div className="roi-status">
+          <span className="status-dot"></span>
+          Analytics Active
+        </div>
 
-                <div className="roi-period">
-                    Last 5 Months
-                </div>
+      </div>
 
-            </div>
 
+      {/* ================================================== */}
+      {/* KPI CARDS */}
+      {/* ================================================== */}
 
-            {/* KPI Cards */}
+      <div className="kpi-grid">
 
-            <div className="roi-kpi-grid">
+        <KPICard
+          title="Total Shipments"
+          value="20"
+          subtitle="Evaluated shipments"
+          icon="📦"
+        />
 
-                <div className="roi-kpi-card">
+        <KPICard
+          title="Cost Saving"
+          value="₹2,350"
+          subtitle="Total estimated saving"
+          icon="💰"
+        />
 
-                    <span>Total Savings</span>
+        <KPICard
+          title="On-Time Rate"
+          value="75%"
+          subtitle="Delivery performance"
+          icon="🚚"
+        />
 
-                    <h2>
-                        ₹{roiSummary.totalSavings.toLocaleString()}
-                    </h2>
+        <KPICard
+          title="Action Success"
+          value="76%"
+          subtitle="Successful prescriptions"
+          icon="✓"
+        />
 
-                    <p>
-                        Savings generated from decisions
-                    </p>
+        <KPICard
+          title="ROI"
+          value="18.8%"
+          subtitle="Return on prescription"
+          icon="📈"
+        />
 
-                </div>
+      </div>
 
 
-                <div className="roi-kpi-card">
+      {/* ================================================== */}
+      {/* MAIN CHART ROW */}
+      {/* ================================================== */}
 
-                    <span>Total Decisions</span>
+      <div className="chart-grid">
 
-                    <h2>
-                        {roiSummary.totalDecisions}
-                    </h2>
+        {/* Expected vs Actual Cost */}
 
-                    <p>
-                        Decisions evaluated
-                    </p>
+        <ChartCard
+          title="Expected vs Actual Cost"
+          subtitle="Cost impact after applying prescriptions"
+        >
 
-                </div>
+          <ResponsiveContainer
+            width="100%"
+            height={300}
+          >
 
+            <BarChart data={costData}>
 
-                <div className="roi-kpi-card">
+              <CartesianGrid
+                strokeDasharray="3 3"
+              />
 
-                    <span>Average ROI</span>
+              <XAxis
+                dataKey="name"
+              />
 
-                    <h2>
-                        {roiSummary.averageROI}%
-                    </h2>
+              <YAxis />
 
-                    <p>
-                        Average return generated
-                    </p>
+              <Tooltip />
 
-                </div>
+              <Legend />
 
+              <Bar
+                dataKey="cost"
+                name="Cost"
+              />
 
-                <div className="roi-kpi-card">
+            </BarChart>
 
-                    <span>Success Rate</span>
+          </ResponsiveContainer>
 
-                    <h2>
-                        {roiSummary.successRate}%
-                    </h2>
+        </ChartCard>
 
-                    <p>
-                        Successful decisions
-                    </p>
 
-                </div>
+        {/* Delivery Performance */}
 
-            </div>
+        <ChartCard
+          title="Delivery Performance"
+          subtitle="On-time vs delayed shipments"
+        >
 
+          <ResponsiveContainer
+            width="100%"
+            height={300}
+          >
 
-            {/* Cost Comparison */}
+            <PieChart>
 
-            <div className="roi-section">
+              <Pie
+                data={deliveryData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                label
+              >
 
-                <div className="roi-section-header">
+                {deliveryData.map(
+                  (entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                    />
+                  )
+                )}
 
-                    <h2>
-                        Expected vs Actual Cost
-                    </h2>
+              </Pie>
 
-                    <p>
-                        Comparison of expected and actual
-                        operational costs.
-                    </p>
+              <Tooltip />
 
-                </div>
+              <Legend />
 
+            </PieChart>
 
-                <div className="cost-chart">
+          </ResponsiveContainer>
 
-                    {costData.map((item) => {
+        </ChartCard>
 
-                        const expectedWidth =
-                            Math.min(
-                                item.expected / 1500,
-                                100
-                            );
+      </div>
 
-                        const actualWidth =
-                            Math.min(
-                                item.actual / 1500,
-                                100
-                            );
 
-                        return (
-                            <div
-                                className="cost-row"
-                                key={item.month}
-                            >
+      {/* ================================================== */}
+      {/* ACTION PERFORMANCE */}
+      {/* ================================================== */}
 
-                                <div className="cost-month">
-                                    {item.month}
-                                </div>
+      <div className="chart-grid">
 
-                                <div className="cost-bars">
+        <ChartCard
+          title="Prescription Action Performance"
+          subtitle="Success rate by recommended action"
+        >
 
-                                    <div
-                                        className="expected-bar"
-                                        style={{
-                                            width:
-                                                `${expectedWidth}%`
-                                        }}
-                                    >
-                                        <span>
-                                            ₹
-                                            {(
-                                                item.expected /
-                                                1000
-                                            ).toFixed(0)}
-                                            k
-                                        </span>
-                                    </div>
+          <ResponsiveContainer
+            width="100%"
+            height={320}
+          >
 
+            <BarChart data={actionData}>
 
-                                    <div
-                                        className="actual-bar"
-                                        style={{
-                                            width:
-                                                `${actualWidth}%`
-                                        }}
-                                    >
-                                        <span>
-                                            ₹
-                                            {(
-                                                item.actual /
-                                                1000
-                                            ).toFixed(0)}
-                                            k
-                                        </span>
-                                    </div>
+              <CartesianGrid
+                strokeDasharray="3 3"
+              />
 
-                                </div>
+              <XAxis
+                dataKey="action"
+              />
 
-                            </div>
-                        );
+              <YAxis
+                domain={[0, 100]}
+              />
 
-                    })}
+              <Tooltip />
 
-                </div>
+              <Bar
+                dataKey="successRate"
+                name="Success Rate (%)"
+              />
 
+            </BarChart>
 
-                <div className="chart-legend">
+          </ResponsiveContainer>
 
-                    <span>
-                        <i className="legend expected"></i>
-                        Expected Cost
-                    </span>
+        </ChartCard>
 
-                    <span>
-                        <i className="legend actual"></i>
-                        Actual Cost
-                    </span>
 
-                </div>
+        {/* Shipping Mode */}
 
-            </div>
+        <ChartCard
+          title="Savings by Shipping Mode"
+          subtitle="Cost saving generated by shipping mode"
+        >
 
+          <ResponsiveContainer
+            width="100%"
+            height={320}
+          >
 
-            {/* Bottom Section */}
+            <BarChart data={shippingModeData}>
 
-            <div className="roi-two-column">
+              <CartesianGrid
+                strokeDasharray="3 3"
+              />
 
+              <XAxis
+                dataKey="mode"
+                angle={-15}
+                textAnchor="end"
+                height={70}
+              />
 
-                {/* ROI Trend */}
+              <YAxis />
 
-                <div className="roi-section">
+              <Tooltip />
 
-                    <div className="roi-section-header">
+              <Bar
+                dataKey="savings"
+                name="Savings (₹)"
+              />
 
-                        <h2>
-                            ROI Trend
-                        </h2>
+            </BarChart>
 
-                        <p>
-                            ROI performance over time.
-                        </p>
+          </ResponsiveContainer>
 
-                    </div>
+        </ChartCard>
 
+      </div>
 
-                    <div className="roi-trend">
 
-                        {roiData.map((item) => {
+      {/* ================================================== */}
+      {/* MARKET ANALYTICS */}
+      {/* ================================================== */}
 
-                            return (
-                                <div
-                                    className="roi-point"
-                                    key={item.month}
-                                >
+      <ChartCard
+        title="Cost Saving by Market"
+        subtitle="Prescription impact across markets"
+        className="full-width-chart"
+      >
 
-                                    <div
-                                        className="roi-column"
-                                        style={{
-                                            height:
-                                                `${item.roi * 8}px`
-                                        }}
-                                    >
-                                        <span>
-                                            {item.roi}%
-                                        </span>
-                                    </div>
+        <ResponsiveContainer
+          width="100%"
+          height={320}
+        >
 
-                                    <label>
-                                        {item.month}
-                                    </label>
+          <LineChart data={marketData}>
 
-                                </div>
-                            );
+            <CartesianGrid
+              strokeDasharray="3 3"
+            />
 
-                        })}
+            <XAxis
+              dataKey="market"
+            />
 
-                    </div>
+            <YAxis />
 
-                </div>
+            <Tooltip />
 
+            <Legend />
 
-                {/* Decision Success */}
+            <Line
+              type="monotone"
+              dataKey="savings"
+              name="Cost Saving (₹)"
+              strokeWidth={3}
+            />
 
-                <div className="roi-section">
+          </LineChart>
 
-                    <div className="roi-section-header">
+        </ResponsiveContainer>
 
-                        <h2>
-                            Decision Success
-                        </h2>
+      </ChartCard>
 
-                        <p>
-                            Overall decision performance.
-                        </p>
 
-                    </div>
+      {/* ================================================== */}
+      {/* ROI SUMMARY */}
+      {/* ================================================== */}
 
+      <div className="roi-summary">
 
-                    <div className="success-container">
+        <div className="summary-header">
 
-                        <div
-                            className="success-circle"
-                            style={{
-                                background:
-                                    `conic-gradient(
-                                        #2563eb
-                                        ${roiSummary.successRate}%,
-                                        #e5e7eb
-                                        ${roiSummary.successRate}%
-                                    )`
-                            }}
-                        >
+          <h2>
+            ROI Summary
+          </h2>
 
-                            <div className="success-inner">
-
-                                <strong>
-                                    {roiSummary.successRate}%
-                                </strong>
-
-                                <span>
-                                    Success
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <div className="success-details">
-
-                            <div>
-                                <strong>
-                                    {Math.round(
-                                        roiSummary.totalDecisions *
-                                        roiSummary.successRate /
-                                        100
-                                    )}
-                                </strong>
-
-                                <span>
-                                    Successful
-                                </span>
-                            </div>
-
-
-                            <div>
-                                <strong>
-                                    {roiSummary.totalDecisions -
-                                        Math.round(
-                                            roiSummary.totalDecisions *
-                                            roiSummary.successRate /
-                                            100
-                                        )}
-                                </strong>
-
-                                <span>
-                                    Unsuccessful
-                                </span>
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
+          <p>
+            Overall impact of supply-chain prescriptions
+          </p>
 
         </div>
-    );
-}
 
+
+        <div className="summary-grid">
+
+          <div className="summary-item">
+
+            <span>
+              Expected Cost
+            </span>
+
+            <strong>
+              ₹12,500
+            </strong>
+
+          </div>
+
+
+          <div className="summary-item">
+
+            <span>
+              Actual Cost
+            </span>
+
+            <strong>
+              ₹10,150
+            </strong>
+
+          </div>
+
+
+          <div className="summary-item">
+
+            <span>
+              Total Saving
+            </span>
+
+            <strong>
+              ₹2,350
+            </strong>
+
+          </div>
+
+
+          <div className="summary-item">
+
+            <span>
+              ROI
+            </span>
+
+            <strong>
+              18.8%
+            </strong>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
 
 export default DecisionROI;
