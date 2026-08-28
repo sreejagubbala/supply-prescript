@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 const mockShipments = [
   { id: 'SHP-001', origin: 'Chennai', destination: 'Bengaluru', status: 'On-Time', eta: '2026-08-28', riskScore: 12 },
@@ -20,6 +20,7 @@ function Shipments() {
   const [shipments, setShipments] = useState([])
   const [statusFilter, setStatusFilter] = useState('All')
   const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState(null)
 
   useEffect(() => {
     setShipments(mockShipments)
@@ -79,7 +80,11 @@ function Shipments() {
             </thead>
             <tbody>
               {filtered.map((s) => (
-                <tr key={s.id} className="border-b border-gray-700">
+                <tr
+                  key={s.id}
+                  onClick={() => setSelected(s)}
+                  className="border-b border-gray-700 cursor-pointer hover:bg-gray-700/50 transition"
+                >
                   <td className="py-2">{s.id}</td>
                   <td className="py-2">{s.origin}</td>
                   <td className="py-2">{s.destination}</td>
@@ -94,6 +99,28 @@ function Shipments() {
           </table>
         )}
       </div>
+
+      {/* Detail Modal */}
+      {selected && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md relative">
+            <button
+              onClick={() => setSelected(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            <h3 className="text-xl font-bold mb-4 text-purple-400">{selected.id}</h3>
+            <div className="space-y-2 text-sm">
+              <p><span className="text-gray-400">Origin:</span> {selected.origin}</p>
+              <p><span className="text-gray-400">Destination:</span> {selected.destination}</p>
+              <p><span className="text-gray-400">Status:</span> <span className={selected.status === 'Delayed' ? 'text-red-400' : 'text-green-400'}>{selected.status}</span></p>
+              <p><span className="text-gray-400">ETA:</span> {selected.eta}</p>
+              <p><span className="text-gray-400">Delay Risk Score:</span> <span className={riskColor(selected.riskScore)}>{selected.riskScore}%</span></p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
