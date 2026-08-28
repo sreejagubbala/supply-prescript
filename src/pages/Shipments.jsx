@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, X, ArrowUp, ArrowDown, Download, MapPin } from 'lucide-react'
+import { Search, X, ArrowUp, ArrowDown, Download } from 'lucide-react'
 
 const mockShipments = [
   { id: 'SHP-001', origin: 'Chennai', destination: 'Bengaluru', status: 'On-Time', eta: '2026-08-28', riskScore: 12 },
@@ -14,12 +14,19 @@ const mockShipments = [
   { id: 'SHP-010', origin: 'Delhi', destination: 'Kolkata', status: 'Delayed', eta: '2026-08-30', riskScore: 55 },
   { id: 'SHP-011', origin: 'Pune', destination: 'Mumbai', status: 'On-Time', eta: '2026-08-29', riskScore: 18 },
   { id: 'SHP-012', origin: 'Bengaluru', destination: 'Chennai', status: 'On-Time', eta: '2026-08-27', riskScore: 10 },
+  { id: 'SHP-013', origin: 'Ahmedabad', destination: 'Surat', status: 'On-Time', eta: '2026-08-29', riskScore: 22 },
+  { id: 'SHP-014', origin: 'Jaipur', destination: 'Delhi', status: 'Delayed', eta: '2026-09-02', riskScore: 72 },
+  { id: 'SHP-015', origin: 'Chennai', destination: 'Coimbatore', status: 'On-Time', eta: '2026-08-28', riskScore: 5 },
+  { id: 'SHP-016', origin: 'Lucknow', destination: 'Kanpur', status: 'Delayed', eta: '2026-08-31', riskScore: 60 },
+  { id: 'SHP-017', origin: 'Bengaluru', destination: 'Mysuru', status: 'On-Time', eta: '2026-08-27', riskScore: 14 },
+  { id: 'SHP-018', origin: 'Mumbai', destination: 'Nagpur', status: 'Delayed', eta: '2026-09-01', riskScore: 88 },
+  { id: 'SHP-019', origin: 'Kolkata', destination: 'Bhubaneswar', status: 'On-Time', eta: '2026-08-30', riskScore: 30 },
+  { id: 'SHP-020', origin: 'Delhi', destination: 'Chandigarh', status: 'Delayed', eta: '2026-09-03', riskScore: 95 },
 ]
 
-const ROWS_PER_PAGE = 5
+const ROWS_PER_PAGE = 20
 const HIGH_RISK_THRESHOLD = 70
 
-// Assign a consistent color per city name so origin/destination tags look distinct
 const cityColors = {}
 const palette = ['bg-blue-400', 'bg-pink-400', 'bg-teal-400', 'bg-orange-400', 'bg-indigo-400', 'bg-yellow-400']
 function getCityColor(city) {
@@ -85,7 +92,6 @@ function Shipments() {
     setShipments(mockShipments)
   }, [])
 
-  // Filtering
   const filtered = shipments.filter((s) => {
     const matchesStatus = statusFilter === 'All' || s.status === statusFilter
     const matchesSearch =
@@ -97,7 +103,6 @@ function Shipments() {
     return matchesStatus && matchesSearch && matchesDateFrom && matchesDateTo
   })
 
-  // Sorting
   const sorted = [...filtered].sort((a, b) => {
     if (!sortConfig.key) return 0
     const valA = a[sortConfig.key]
@@ -110,7 +115,6 @@ function Shipments() {
       : String(valB).localeCompare(String(valA))
   })
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE))
   const paginated = sorted.slice(
     (currentPage - 1) * ROWS_PER_PAGE,
@@ -145,7 +149,6 @@ function Shipments() {
     }
   }
 
-  // Reset to page 1 whenever filters/search/sort change
   useEffect(() => {
     setCurrentPage(1)
   }, [statusFilter, search, sortConfig, dateFrom, dateTo])
@@ -163,7 +166,6 @@ function Shipments() {
 
   return (
     <div className="p-6 text-white space-y-6">
-      {/* Filters */}
       <div className="flex flex-wrap gap-4 items-center">
         <div className="flex items-center bg-gray-800 rounded-lg px-3 py-2 gap-2 flex-1 min-w-[200px]">
           <Search size={18} className="text-gray-400" />
@@ -212,7 +214,6 @@ function Shipments() {
         </button>
       </div>
 
-      {/* Bulk Action Bar */}
       {selectedRows.length > 0 && (
         <div className="flex items-center justify-between bg-purple-600/20 border border-purple-500 rounded-lg px-4 py-2">
           <span className="text-sm">{selectedRows.length} shipment(s) selected</span>
@@ -233,7 +234,6 @@ function Shipments() {
         </div>
       )}
 
-      {/* Table */}
       <div className="bg-gray-800 rounded-xl p-4">
         <h3 className="text-lg font-semibold mb-4">Shipments ({sorted.length})</h3>
         {paginated.length === 0 ? (
@@ -302,31 +302,31 @@ function Shipments() {
               </tbody>
             </table>
 
-            {/* Pagination Controls */}
-            <div className="flex items-center justify-between mt-4 text-sm text-gray-400">
-              <span>Page {currentPage} of {totalPages}</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  Next
-                </button>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 text-sm text-gray-400">
+                <span>Page {currentPage} of {totalPages}</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Detail Modal */}
       {selected && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md relative">
