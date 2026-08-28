@@ -7,3 +7,4 @@ PROCESSED_DATA_PATH = BASE_DIR / "data" / "processed" / "processed_supply_chain.
 
 TARGET_COLUMN = "Late_delivery_risk"
 MODEL_PATH = BASE_DIR / "ml-model" / "models" / "xgboost_delay_model.pkl"
+DURATION_MODEL_PATH = BASE_DIR / "ml-model" / "models" / "xgboost_duration_model.pkl"
