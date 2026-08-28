@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, X, ArrowUp, ArrowDown, Download } from 'lucide-react'
+import { Search, X, ArrowUp, ArrowDown, Download, MapPin } from 'lucide-react'
 
 const mockShipments = [
   { id: 'SHP-001', origin: 'Chennai', destination: 'Bengaluru', status: 'On-Time', eta: '2026-08-28', riskScore: 12 },
@@ -17,9 +17,21 @@ const mockShipments = [
 ]
 
 const ROWS_PER_PAGE = 5
+const HIGH_RISK_THRESHOLD = 70
+
+// Assign a consistent color per city name so origin/destination tags look distinct
+const cityColors = {}
+const palette = ['bg-blue-400', 'bg-pink-400', 'bg-teal-400', 'bg-orange-400', 'bg-indigo-400', 'bg-yellow-400']
+function getCityColor(city) {
+  if (!cityColors[city]) {
+    const usedCount = Object.keys(cityColors).length
+    cityColors[city] = palette[usedCount % palette.length]
+  }
+  return cityColors[city]
+}
 
 function riskColor(score) {
-  if (score >= 70) return 'text-red-400'
+  if (score >= HIGH_RISK_THRESHOLD) return 'text-red-400'
   if (score >= 40) return 'text-yellow-400'
   return 'text-green-400'
 }
@@ -32,6 +44,15 @@ function StatusBadge({ status }) {
         : 'bg-green-500/20 text-green-400'
     }`}>
       {status}
+    </span>
+  )
+}
+
+function CityTag({ city }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`w-2 h-2 rounded-full ${getCityColor(city)}`}></span>
+      {city}
     </span>
   )
 }
@@ -54,8 +75,11 @@ function Shipments() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
+  const [sortConfig, setSortConfig] = useState({ key: 'riskScore', direction: 'desc' })
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedRows, setSelectedRows] = useState([])
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
     setShipments(mockShipments)
@@ -68,7 +92,9 @@ function Shipments() {
       s.id.toLowerCase().includes(search.toLowerCase()) ||
       s.origin.toLowerCase().includes(search.toLowerCase()) ||
       s.destination.toLowerCase().includes(search.toLowerCase())
-    return matchesStatus && matchesSearch
+    const matchesDateFrom = !dateFrom || s.eta >= dateFrom
+    const matchesDateTo = !dateTo || s.eta <= dateTo
+    return matchesStatus && matchesSearch && matchesDateFrom && matchesDateTo
   })
 
   // Sorting
@@ -103,10 +129,26 @@ function Shipments() {
     return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="inline ml-1" /> : <ArrowDown size={14} className="inline ml-1" />
   }
 
+  function toggleRow(id) {
+    setSelectedRows((prev) =>
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+    )
+  }
+
+  function toggleSelectAll() {
+    const pageIds = paginated.map((s) => s.id)
+    const allSelected = pageIds.every((id) => selectedRows.includes(id))
+    if (allSelected) {
+      setSelectedRows((prev) => prev.filter((id) => !pageIds.includes(id)))
+    } else {
+      setSelectedRows((prev) => [...new Set([...prev, ...pageIds])])
+    }
+  }
+
   // Reset to page 1 whenever filters/search/sort change
   useEffect(() => {
     setCurrentPage(1)
-  }, [statusFilter, search, sortConfig])
+  }, [statusFilter, search, sortConfig, dateFrom, dateTo])
 
   const columns = [
     { key: 'id', label: 'ID' },
@@ -116,6 +158,8 @@ function Shipments() {
     { key: 'eta', label: 'ETA' },
     { key: 'riskScore', label: 'Delay Risk' },
   ]
+
+  const allOnPageSelected = paginated.length > 0 && paginated.every((s) => selectedRows.includes(s.id))
 
   return (
     <div className="p-6 text-white space-y-6">
@@ -142,6 +186,23 @@ function Shipments() {
           <option value="Delayed">Delayed</option>
         </select>
 
+        <div className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-2 text-sm">
+          <span className="text-gray-400">From</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="bg-transparent outline-none text-white"
+          />
+          <span className="text-gray-400">To</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="bg-transparent outline-none text-white"
+          />
+        </div>
+
         <button
           onClick={() => exportToCSV(sorted)}
           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 transition rounded-lg px-4 py-2 text-sm font-semibold"
@@ -150,6 +211,27 @@ function Shipments() {
           Export CSV
         </button>
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectedRows.length > 0 && (
+        <div className="flex items-center justify-between bg-purple-600/20 border border-purple-500 rounded-lg px-4 py-2">
+          <span className="text-sm">{selectedRows.length} shipment(s) selected</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => alert(`Marked ${selectedRows.length} shipment(s) as reviewed`)}
+              className="text-sm bg-purple-600 hover:bg-purple-700 transition rounded-lg px-3 py-1"
+            >
+              Mark as Reviewed
+            </button>
+            <button
+              onClick={() => setSelectedRows([])}
+              className="text-sm bg-gray-700 hover:bg-gray-600 transition rounded-lg px-3 py-1"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-gray-800 rounded-xl p-4">
@@ -161,6 +243,14 @@ function Shipments() {
             <table className="w-full text-left">
               <thead>
                 <tr className="text-gray-400 text-sm border-b border-gray-700">
+                  <th className="pb-2 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      onChange={toggleSelectAll}
+                      className="accent-purple-500"
+                    />
+                  </th>
                   {columns.map((col) => (
                     <th
                       key={col.key}
@@ -174,20 +264,41 @@ function Shipments() {
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => setSelected(s)}
-                    className="border-b border-gray-700 cursor-pointer hover:bg-gray-700/50 transition"
-                  >
-                    <td className="py-2">{s.id}</td>
-                    <td className="py-2">{s.origin}</td>
-                    <td className="py-2">{s.destination}</td>
-                    <td className="py-2"><StatusBadge status={s.status} /></td>
-                    <td className="py-2">{s.eta}</td>
-                    <td className={`py-2 font-semibold ${riskColor(s.riskScore)}`}>{s.riskScore}%</td>
-                  </tr>
-                ))}
+                {paginated.map((s) => {
+                  const isHighRisk = s.riskScore >= HIGH_RISK_THRESHOLD
+                  return (
+                    <tr
+                      key={s.id}
+                      className={`border-b border-gray-700 cursor-pointer hover:bg-gray-700/50 transition ${
+                        isHighRisk ? 'bg-red-500/5' : ''
+                      }`}
+                    >
+                      <td className="py-2" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.includes(s.id)}
+                          onChange={() => toggleRow(s.id)}
+                          className="accent-purple-500"
+                        />
+                      </td>
+                      <td className="py-2" onClick={() => setSelected(s)}>
+                        <span className="flex items-center gap-1.5">
+                          {isHighRisk && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                          )}
+                          {s.id}
+                        </span>
+                      </td>
+                      <td className="py-2" onClick={() => setSelected(s)}><CityTag city={s.origin} /></td>
+                      <td className="py-2" onClick={() => setSelected(s)}><CityTag city={s.destination} /></td>
+                      <td className="py-2" onClick={() => setSelected(s)}><StatusBadge status={s.status} /></td>
+                      <td className="py-2" onClick={() => setSelected(s)}>{s.eta}</td>
+                      <td className={`py-2 font-semibold ${riskColor(s.riskScore)}`} onClick={() => setSelected(s)}>
+                        {s.riskScore}%
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
 
@@ -225,10 +336,15 @@ function Shipments() {
             >
               <X size={20} />
             </button>
-            <h3 className="text-xl font-bold mb-4 text-purple-400">{selected.id}</h3>
+            <h3 className="text-xl font-bold mb-4 text-purple-400 flex items-center gap-2">
+              {selected.id}
+              {selected.riskScore >= HIGH_RISK_THRESHOLD && (
+                <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">High Risk</span>
+              )}
+            </h3>
             <div className="space-y-2 text-sm">
-              <p><span className="text-gray-400">Origin:</span> {selected.origin}</p>
-              <p><span className="text-gray-400">Destination:</span> {selected.destination}</p>
+              <p><span className="text-gray-400">Origin:</span> <CityTag city={selected.origin} /></p>
+              <p><span className="text-gray-400">Destination:</span> <CityTag city={selected.destination} /></p>
               <p>
                 <span className="text-gray-400">Status:</span>{' '}
                 <StatusBadge status={selected.status} />
