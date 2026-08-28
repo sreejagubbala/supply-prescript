@@ -21,7 +21,7 @@ FEATURE_COLUMNS = [
 ]
 
 
-def create_features(df):
+def create_features(df, include_target=True):
     df = df.copy()
 
     date_column = "shipping date (DateOrders)"
@@ -32,7 +32,11 @@ def create_features(df):
 
     df = df.drop(columns=[date_column], errors="ignore")
 
-    required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
+    required_columns = FEATURE_COLUMNS.copy()
+
+    if include_target:
+        required_columns.append(TARGET_COLUMN)
+
     missing_columns = [col for col in required_columns if col not in df.columns]
 
     if missing_columns:

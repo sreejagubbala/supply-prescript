@@ -8,9 +8,8 @@ def load_data():
 
 def preprocess_data(df):
     leakage_columns = [
-        "Delivery Status",
-        "Days for shipping (real)"
-    ]
+    "Delivery Status"
+]
 
     df = df.drop(columns=leakage_columns, errors="ignore")
     df = df.dropna(subset=[TARGET_COLUMN])
