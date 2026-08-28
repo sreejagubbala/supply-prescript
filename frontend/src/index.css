@@ -1,240 +1,144 @@
 /* ============================================================
-   DECISION ROI DASHBOARD
+   HOME PAGE
    ============================================================ */
 
-.roi-page {
-  padding: 24px;
+.home-page {
   min-height: 100vh;
-  background: #f5f7fb;
-}
-
-
-/* ============================================================
-   HEADER
-   ============================================================ */
-
-.roi-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.roi-header h1 {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.roi-header p {
-  margin-top: 6px;
-  color: #6b7280;
-}
-
-.roi-status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: #ffffff;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #22c55e;
+  justify-content: center;
+  padding: 30px;
+  background: #f7f8fa;
 }
 
 
-/* ============================================================
-   KPI CARDS
-   ============================================================ */
+/* HOME CARD */
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(5, minmax(0, 1fr));
-
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.kpi-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.kpi-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.kpi-icon {
-  font-size: 20px;
-}
-
-.kpi-title {
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.kpi-value {
-  margin-top: 12px;
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.kpi-subtitle {
-  margin-top: 6px;
-  color: #9ca3af;
-  font-size: 12px;
-}
-
-
-/* ============================================================
-   CHART GRID
-   ============================================================ */
-
-.chart-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
-
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-
-/* ============================================================
-   CHART CARD
-   ============================================================ */
-
-.chart-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.chart-card-header {
-  margin-bottom: 12px;
-}
-
-.chart-card-header h3 {
-  margin: 0;
-  font-size: 17px;
-}
-
-.chart-card-header p {
-  margin-top: 5px;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.chart-card-body {
+.home-card {
   width: 100%;
+  max-width: 650px;
+  padding: 50px;
+  text-align: center;
+
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
 }
 
-.full-width-chart {
-  margin-bottom: 20px;
+
+/* ICON */
+
+.home-icon {
+  font-size: 50px;
+  margin-bottom: 15px;
 }
 
 
-/* ============================================================
-   ROI SUMMARY
-   ============================================================ */
+/* TITLE */
 
-.roi-summary {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 24px;
-  margin-top: 20px;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06);
+.home-card h1 {
+  margin: 0 0 8px;
+
+  font-size: 34px;
+  font-weight: 700;
+
+  color: #111827;
 }
 
-.summary-header h2 {
+
+/* SUBTITLE */
+
+.home-card > p {
   margin: 0;
-}
 
-.summary-header p {
-  margin-top: 6px;
   color: #6b7280;
+  font-size: 16px;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(4, 1fr);
 
-  gap: 20px;
-  margin-top: 20px;
-}
+/* DESCRIPTION */
 
-.summary-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.home-description {
+  max-width: 500px;
+  margin: 18px auto 30px !important;
 
-.summary-item span {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.summary-item strong {
-  font-size: 22px;
+  line-height: 1.6;
+  font-size: 14px !important;
 }
 
 
 /* ============================================================
-   RESPONSIVE DESIGN
+   BUTTONS
    ============================================================ */
 
-@media (max-width: 1100px) {
+.home-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
 
-  .kpi-grid {
-    grid-template-columns:
-      repeat(3, 1fr);
-  }
-
-  .chart-grid {
-    grid-template-columns:
-      1fr;
-  }
-
+  margin-top: 30px;
 }
 
 
-@media (max-width: 700px) {
+.home-button {
+  min-width: 210px;
 
-  .roi-page {
-    padding: 16px;
+  padding: 16px 22px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #111827;
+  color: white;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  transition: transform 0.2s ease,
+              opacity 0.2s ease;
+}
+
+
+.home-button:hover {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+
+
+.button-icon {
+  font-size: 18px;
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+  .home-card {
+    padding: 35px 20px;
   }
 
-  .roi-header {
+  .home-card h1 {
+    font-size: 28px;
+  }
+
+  .home-buttons {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
   }
 
-  .kpi-grid {
-    grid-template-columns:
-      1fr;
-  }
-
-  .summary-grid {
-    grid-template-columns:
-      repeat(2, 1fr);
+  .home-button {
+    width: 100%;
   }
 
 }
