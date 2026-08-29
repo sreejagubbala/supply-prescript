@@ -94,6 +94,14 @@ const marketData = [
 // ============================================================
 
 function DecisionROI() {
+  return (
+    <div className="roi-page">
+
+      {/* ================================================== */}
+      {/* PAGE HEADER */}
+      {/* ================================================== */}
+
+      <div className="roi-header">
 
   const navigate = useNavigate();
 
@@ -844,5 +852,10 @@ function DecisionROI() {
   );
 }
 
+      </div>
+
+    </div>
+  );
+}
 
 export default DecisionROI;

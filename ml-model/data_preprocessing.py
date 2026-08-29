@@ -7,24 +7,24 @@ def load_data():
 
 
 def preprocess_data(df):
-    # Remove columns that reveal delivery outcome after it happens
     leakage_columns = [
-        "Delivery Status",
-        "Days for shipping (real)"
-    ]
+    "Delivery Status"
+]
 
     df = df.drop(columns=leakage_columns, errors="ignore")
     df = df.dropna(subset=[TARGET_COLUMN])
+    df = df.drop_duplicates()
 
     return df
 
 
 if __name__ == "__main__":
-    data = load_data()
-    processed_data = preprocess_data(data)
+    df = load_data()
+    processed_df = preprocess_data(df)
 
     PROCESSED_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    processed_data.to_csv(PROCESSED_DATA_PATH, index=False)
+    processed_df.to_csv(PROCESSED_DATA_PATH, index=False)
 
-    print("Processed data saved successfully.")
-    print(processed_data.shape)
+    print(f"Original shape: {df.shape}")
+    print(f"Processed shape: {processed_df.shape}")
+    print("Preprocessing completed.")
