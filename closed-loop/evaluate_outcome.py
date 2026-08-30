@@ -210,10 +210,11 @@ def actual_delivery_days(row) -> int:
     """
     Generate deterministic sample actual delivery.
 
-    High-risk shipments receive a sample delay.
+    High-risk shipments receive a delay.
     Low-risk shipments are on time or slightly early.
 
-    This is synthetic testing data.
+    A high-risk Same Day shipment can still be delayed by
+    1 or 2 days.
     """
 
     scheduled = int(
@@ -228,28 +229,36 @@ def actual_delivery_days(row) -> int:
         str(row["Shipment_ID"]).split("-")[-1]
     )
 
-    # Same Day should not become negative
-    if scheduled == 0:
-        return 0
-
+    # --------------------------------------------------------
     # High-risk shipment
+    # --------------------------------------------------------
+
     if risk == 1:
 
-        # Alternate 1-day and 2-day delay
+        # Even Same Day shipments can be delayed
+        # because the shipment has been predicted as high risk.
+
         if shipment_number % 2 == 0:
             return scheduled + 2
 
         return scheduled + 1
 
+    # --------------------------------------------------------
     # Low-risk shipment
+    # --------------------------------------------------------
+
+    if scheduled == 0:
+        return 0
+
+    # Some low-risk shipments arrive one day early
     if shipment_number % 3 == 0:
         return max(
             scheduled - 1,
             0,
         )
 
+    # Otherwise arrive as expected
     return scheduled
-
 
 # ============================================================
 # Generate synthetic actual cost
