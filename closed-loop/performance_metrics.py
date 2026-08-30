@@ -206,6 +206,231 @@ def prepare_outcome_data(
 
 
 # ============================================================
+# Predicted vs Actual Comparison
+# ============================================================
+
+def average_cost_difference(
+    df: pd.DataFrame,
+) -> float:
+    """
+    Average difference between actual and expected cost.
+
+    Positive value = actual cost was higher.
+    Negative value = actual cost was lower.
+    """
+
+    if len(df) == 0:
+        return 0.0
+
+    return float(
+        (
+            df["actual_cost"]
+            - df["expected_cost"]
+        ).mean()
+    )
+
+
+def average_delivery_difference(
+    df: pd.DataFrame,
+) -> float:
+    """
+    Average difference between actual and expected
+    delivery days.
+
+    Positive value = shipment was delayed.
+    Negative value = shipment arrived early.
+    """
+
+    if len(df) == 0:
+        return 0.0
+
+    return float(
+        (
+            df["actual_delivery_days"]
+            - df["expected_delivery_days"]
+        ).mean()
+    )
+
+
+def cost_prediction_accuracy(
+    df: pd.DataFrame,
+) -> float:
+    """
+    Calculate how close actual cost was to expected cost.
+    """
+
+    if len(df) == 0:
+        return 0.0
+
+    expected = df["expected_cost"]
+
+    valid = expected != 0
+
+    if valid.sum() == 0:
+        return 0.0
+
+    accuracy = (
+        1
+        - (
+            (
+                df.loc[valid, "actual_cost"]
+                - df.loc[valid, "expected_cost"]
+            ).abs()
+            / df.loc[valid, "expected_cost"].abs()
+        )
+    ) * 100
+
+    return float(
+        accuracy.clip(lower=0).mean()
+    )
+
+
+def delivery_prediction_accuracy(
+    df: pd.DataFrame,
+) -> float:
+    """
+    Calculate how close actual delivery time was
+    to expected delivery time.
+    """
+
+    if len(df) == 0:
+        return 0.0
+
+    expected = df["expected_delivery_days"]
+
+    valid = expected != 0
+
+    if valid.sum() == 0:
+        return 0.0
+
+    accuracy = (
+        1
+        - (
+            (
+                df.loc[valid, "actual_delivery_days"]
+                - df.loc[
+                    valid,
+                    "expected_delivery_days",
+                ]
+            ).abs()
+            / df.loc[
+                valid,
+                "expected_delivery_days",
+            ].abs()
+        )
+    ) * 100
+
+    return float(
+        accuracy.clip(lower=0).mean()
+    )
+
+
+def predicted_vs_actual(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Create shipment-level predicted vs actual comparison.
+
+    This is the main Day 10 comparison table.
+    """
+
+    prepared = prepare_outcome_data(df)
+
+    result = prepared[
+        [
+            "Shipment_ID",
+            "recommended_action",
+            "expected_delivery_days",
+            "actual_delivery_days",
+            "expected_cost",
+            "actual_cost",
+            "delivery_status",
+            "outcome_status",
+        ]
+    ].copy()
+
+    result["delivery_difference"] = (
+        result["actual_delivery_days"]
+        - result["expected_delivery_days"]
+    )
+
+    result["cost_difference"] = (
+        result["actual_cost"]
+        - result["expected_cost"]
+    )
+
+    result["delivery_accuracy"] = 0.0
+    result["cost_accuracy"] = 0.0
+
+    valid_delivery = (
+        result["expected_delivery_days"] != 0
+    )
+
+    result.loc[
+        valid_delivery,
+        "delivery_accuracy",
+    ] = (
+        1
+        - (
+            (
+                result.loc[
+                    valid_delivery,
+                    "actual_delivery_days",
+                ]
+                - result.loc[
+                    valid_delivery,
+                    "expected_delivery_days",
+                ]
+            ).abs()
+            / result.loc[
+                valid_delivery,
+                "expected_delivery_days",
+            ].abs()
+        )
+    ) * 100
+
+    valid_cost = (
+        result["expected_cost"] != 0
+    )
+
+    result.loc[
+        valid_cost,
+        "cost_accuracy",
+    ] = (
+        1
+        - (
+            (
+                result.loc[
+                    valid_cost,
+                    "actual_cost",
+                ]
+                - result.loc[
+                    valid_cost,
+                    "expected_cost",
+                ]
+            ).abs()
+            / result.loc[
+                valid_cost,
+                "expected_cost",
+            ].abs()
+        )
+    ) * 100
+
+    result["delivery_accuracy"] = (
+        result["delivery_accuracy"]
+        .clip(lower=0)
+        .round(2)
+    )
+
+    result["cost_accuracy"] = (
+        result["cost_accuracy"]
+        .clip(lower=0)
+        .round(2)
+    )
+
+    return result
+
+# ============================================================
 # Basic KPIs
 # ============================================================
 
@@ -446,6 +671,26 @@ def calculate_metrics(
             risk_prediction_accuracy(prepared),
             2,
         ),
+
+        "average_cost_difference": round(
+            average_cost_difference(prepared),
+            2,
+        ),
+
+        "average_delivery_difference": round(
+            average_delivery_difference(prepared),
+            2,
+        ),
+
+        "cost_prediction_accuracy": round(
+            cost_prediction_accuracy(prepared),
+            2,
+        ),
+
+        "delivery_prediction_accuracy": round(
+            delivery_prediction_accuracy(prepared),
+            2,
+        ),        
     }
 
 
