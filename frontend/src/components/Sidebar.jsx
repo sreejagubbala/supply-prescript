@@ -4,7 +4,8 @@ const navItems = [
   { name: 'Operations', path: '/' },
   { name: 'Shipments', path: '/shipments' },
   { name: 'Suppliers', path: '/suppliers' },
-  { name: 'ROI / Analytics', path: '/analytics' },
+  { name: 'ROI / Analytics', path: '/decision-roi' },
+  { name: 'History', path: '/decision-history'},
 ]
 
 function Sidebar() {
