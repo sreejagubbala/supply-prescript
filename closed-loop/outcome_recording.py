@@ -1,11 +1,15 @@
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 
 
 # ============================================================
-# Project paths
+# SUPPLY PRESCRIPT
+# Member 5 - Closed Loop & Analytics
+# Outcome Recording
 # ============================================================
+
 
 PROJECT_ROOT = (
     Path(__file__)
@@ -21,7 +25,7 @@ SOURCE_FILE = (
     / "sample_shipments.csv"
 )
 
-OUTPUT_FILE = (
+OUTCOME_FILE = (
     PROJECT_ROOT
     / "data"
     / "sample"
@@ -30,25 +34,25 @@ OUTPUT_FILE = (
 
 
 # ============================================================
-# Load source data
+# Load shipment data
 # ============================================================
 
-def load_shipments() -> pd.DataFrame:
+def load_shipments(
+    file_path: Optional[Path] = None,
+) -> pd.DataFrame:
 
-    if not SOURCE_FILE.exists():
+    path = file_path or SOURCE_FILE
+
+    if not path.exists():
         raise FileNotFoundError(
-            f"Source file not found:\n{SOURCE_FILE}"
+            f"Source file not found:\n{path}"
         )
 
-    df = pd.read_csv(
-        SOURCE_FILE
-    )
-
-    return df
+    return pd.read_csv(path)
 
 
 # ============================================================
-# Validate source data
+# Validate shipment data
 # ============================================================
 
 def validate_shipments(
@@ -86,15 +90,16 @@ def validate_shipments(
 
 
 # ============================================================
-# Determine recommended action
+# Recommended action
 # ============================================================
 
 def recommend_action(row) -> str:
     """
-    Generate a simple rule-based prescription for Day 5.
+    Simple rule-based prescription.
 
-    This is NOT the final optimization algorithm.
-    It is only sample decision data for closed-loop testing.
+    This is sample decision data for
+    closed-loop testing and is not the
+    final optimization algorithm.
     """
 
     risk = int(
@@ -131,14 +136,10 @@ def recommend_action(row) -> str:
 
 
 # ============================================================
-# Generate expected delivery
+# Expected delivery
 # ============================================================
 
 def expected_delivery_days(row) -> int:
-    """
-    Expected delivery is based on the team's
-    Days_for_shipment_scheduled field.
-    """
 
     return int(
         row["Days_for_shipment_scheduled"]
@@ -146,19 +147,15 @@ def expected_delivery_days(row) -> int:
 
 
 # ============================================================
-# Generate expected operational cost
+# Expected operational cost
 # ============================================================
 
 def expected_operational_cost(row) -> float:
     """
-    Create a simple sample logistics cost estimate.
+    Assumed project-development formula:
 
-    This is an assumed project-development formula because
-    the source CSV does not contain a shipping-cost column.
-
-    Formula:
         10% of order total
-        + quantity-based handling cost
+        + quantity handling cost
         + shipping-mode adjustment
     """
 
@@ -203,18 +200,17 @@ def expected_operational_cost(row) -> float:
 
 
 # ============================================================
-# Generate synthetic actual delivery
+# Synthetic actual delivery
 # ============================================================
 
 def actual_delivery_days(row) -> int:
     """
-    Generate deterministic sample actual delivery.
+    Generate deterministic sample actual
+    delivery data.
 
-    High-risk shipments receive a delay.
-    Low-risk shipments are on time or slightly early.
-
-    A high-risk Same Day shipment can still be delayed by
-    1 or 2 days.
+    High-risk shipments receive delays.
+    Low-risk shipments are on time or
+    slightly early.
     """
 
     scheduled = int(
@@ -225,100 +221,116 @@ def actual_delivery_days(row) -> int:
         row["Late_delivery_risk"]
     )
 
-    shipment_number = int(
-        str(row["Shipment_ID"]).split("-")[-1]
+    shipment_text = str(
+        row["Shipment_ID"]
     )
 
-    # --------------------------------------------------------
+    try:
+        shipment_number = int(
+            shipment_text.split("-")[-1]
+        )
+    except ValueError:
+        shipment_number = 1
+
+    # Same Day
+    if scheduled == 0:
+
+        if risk == 1:
+            return 1
+
+        return 0
+
     # High-risk shipment
-    # --------------------------------------------------------
-
     if risk == 1:
-
-        # Even Same Day shipments can be delayed
-        # because the shipment has been predicted as high risk.
 
         if shipment_number % 2 == 0:
             return scheduled + 2
 
         return scheduled + 1
 
-    # --------------------------------------------------------
     # Low-risk shipment
-    # --------------------------------------------------------
+    if shipment_number % 2 == 0:
+        return scheduled
 
-    if scheduled == 0:
-        return 0
+    return max(
+        scheduled - 1,
+        0,
+    )
 
-    # Some low-risk shipments arrive one day early
-    if shipment_number % 3 == 0:
-        return max(
-            scheduled - 1,
-            0,
-        )
-
-    # Otherwise arrive as expected
-    return scheduled
 
 # ============================================================
-# Generate synthetic actual cost
+# Synthetic actual cost
 # ============================================================
 
-def actual_operational_cost(
-    expected_cost: float,
-    row,
-) -> float:
+def actual_operational_cost(row) -> float:
     """
     Generate deterministic sample actual cost.
 
-    High-risk shipments have a small disruption overhead.
-
     This is synthetic testing data.
     """
+
+    expected = expected_operational_cost(
+        row
+    )
+
+    shipment_text = str(
+        row["Shipment_ID"]
+    )
+
+    try:
+        shipment_number = int(
+            shipment_text.split("-")[-1]
+        )
+    except ValueError:
+        shipment_number = 1
 
     risk = int(
         row["Late_delivery_risk"]
     )
 
-    shipment_number = int(
-        str(row["Shipment_ID"]).split("-")[-1]
-    )
-
+    # High-risk shipments can incur
+    # additional operational cost.
     if risk == 1:
 
-        # Some high-risk shipments save cost,
-        # others incur disruption cost.
-        if shipment_number % 4 == 0:
-            multiplier = 1.08
-        else:
-            multiplier = 0.96
+        if shipment_number % 2 == 0:
+            return round(
+                expected * 1.04,
+                2,
+            )
 
-    else:
+        return round(
+            expected * 0.96,
+            2,
+        )
 
-        if shipment_number % 5 == 0:
-            multiplier = 1.02
-        else:
-            multiplier = 0.97
+    # Low-risk shipments
+    if shipment_number % 2 == 0:
+        return round(
+            expected * 1.02,
+            2,
+        )
 
     return round(
-        expected_cost * multiplier,
+        expected * 0.97,
         2,
     )
 
 
 # ============================================================
-# Build decision/outcome dataset
+# Create decision outcomes
 # ============================================================
 
 def create_decision_outcomes(
-    df: pd.DataFrame,
+    shipments: pd.DataFrame,
 ) -> pd.DataFrame:
 
-    validate_shipments(df)
+    validate_shipments(
+        shipments
+    )
 
     records = []
 
-    for _, row in df.iterrows():
+    for _, row in shipments.iterrows():
 
         action = recommend_action(
             row
@@ -337,10 +349,7 @@ def create_decision_outcomes(
         )
 
         actual_cost = (
-            actual_operational_cost(
-                expected_cost,
-                row,
-            )
+            actual_operational_cost(row)
         )
 
         if actual_days > expected_days:
@@ -393,10 +402,11 @@ def create_decision_outcomes(
                         "Order_Item_Quantity"
                     ],
 
+                "Sales_per_customer":
+                    row["Sales_per_customer"],
+
                 "Order_Item_Total":
-                    row[
-                        "Order_Item_Total"
-                    ],
+                    row["Order_Item_Total"],
 
                 "Order_Profit_Per_Order":
                     row[
@@ -404,9 +414,7 @@ def create_decision_outcomes(
                     ],
 
                 "Late_delivery_risk":
-                    row[
-                        "Late_delivery_risk"
-                    ],
+                    row["Late_delivery_risk"],
 
                 # Decision
                 "recommended_action":
@@ -440,22 +448,132 @@ def create_decision_outcomes(
 
 
 # ============================================================
-# Save data
+# Save generated outcomes
 # ============================================================
 
 def save_decision_outcomes(
     df: pd.DataFrame,
+    file_path: Optional[Path] = None,
 ) -> None:
 
-    OUTPUT_FILE.parent.mkdir(
+    path = file_path or OUTCOME_FILE
+
+    path.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
 
     df.to_csv(
-        OUTPUT_FILE,
+        path,
         index=False,
     )
+
+
+# ============================================================
+# Record an actual outcome
+# ============================================================
+
+def record_outcome(
+    shipment_id: str,
+    actual_delivery_days: float,
+    actual_cost: float,
+    file_path: Optional[Path] = None,
+) -> pd.Series:
+    """
+    Update one existing shipment's actual result.
+
+    Used for the closed-loop feedback stage.
+    """
+
+    path = file_path or OUTCOME_FILE
+
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Outcome file not found:\n{path}\n\n"
+            "Generate decision outcomes first."
+        )
+
+    df = pd.read_csv(path)
+
+    if "Shipment_ID" not in df.columns:
+        raise ValueError(
+            "Shipment_ID column not found."
+        )
+
+    matches = (
+        df["Shipment_ID"].astype(str)
+        == str(shipment_id)
+    )
+
+    if not matches.any():
+        raise ValueError(
+            f"Shipment '{shipment_id}' "
+            "was not found."
+        )
+
+    index = df.index[matches][0]
+
+    expected_delivery = float(
+        df.loc[
+            index,
+            "expected_delivery_days",
+        ]
+    )
+
+    expected_cost = float(
+        df.loc[
+            index,
+            "expected_cost",
+        ]
+    )
+
+    # Store actual values
+    df.loc[
+        index,
+        "actual_delivery_days",
+    ] = float(actual_delivery_days)
+
+    df.loc[
+        index,
+        "actual_cost",
+    ] = float(actual_cost)
+
+    # Delivery status
+    if (
+        float(actual_delivery_days)
+        > expected_delivery
+    ):
+        delivery_status = "Delayed"
+    else:
+        delivery_status = "On Time"
+
+    df.loc[
+        index,
+        "delivery_status",
+    ] = delivery_status
+
+    # Outcome status
+    if (
+        float(actual_delivery_days)
+        <= expected_delivery
+        and float(actual_cost)
+        <= expected_cost
+    ):
+        outcome_status = "Successful"
+    else:
+        outcome_status = "Unsuccessful"
+
+    df.loc[
+        index,
+        "outcome_status",
+    ] = outcome_status
+
+    df.to_csv(
+        path,
+        index=False,
+    )
+
+    return df.loc[index]
 
 
 # ============================================================
@@ -463,6 +581,11 @@ def save_decision_outcomes(
 # ============================================================
 
 if __name__ == "__main__":
+
+    print("=" * 65)
+    print("SUPPLY PRESCRIPT")
+    print("DECISION / OUTCOME DATA GENERATION")
+    print("=" * 65)
 
     shipments = load_shipments()
 
@@ -474,18 +597,8 @@ if __name__ == "__main__":
         outcomes
     )
 
-    print()
-    print("=" * 65)
     print(
-        "SUPPLY PRESCRIPT - DAY 5"
-    )
-    print(
-        "DECISION / OUTCOME DATA PREPARED"
-    )
-    print("=" * 65)
-
-    print(
-        f"Source rows: {len(shipments)}"
+        f"Source rows   : {len(shipments)}"
     )
 
     print(
@@ -493,7 +606,7 @@ if __name__ == "__main__":
     )
 
     print(
-        f"Output: {OUTPUT_FILE}"
+        f"Output file   : {OUTCOME_FILE}"
     )
 
     print()

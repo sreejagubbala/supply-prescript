@@ -1,29 +1,12 @@
-"""
-Supply Prescript - Closed Loop Feedback
-
-Member 5
-
-Analyzes actual outcomes and identifies:
-- Successful actions
-- Underperforming actions
-- High-risk performance
-- Cost-saving performance
-
-This is the initial feedback layer.
-"""
-
 from pathlib import Path
-from typing import Dict
 
 import pandas as pd
 
-from performance_metrics import (
-    prepare_outcome_data,
-)
-
 
 # ============================================================
-# Paths
+# SUPPLY PRESCRIPT
+# Day 12 - Closed Loop Feedback
+# Member 5 - Closed Loop & Analytics
 # ============================================================
 
 PROJECT_ROOT = (
@@ -33,225 +16,324 @@ PROJECT_ROOT = (
     .parent
 )
 
-DATA_FILE = (
+OUTCOME_FILE = (
     PROJECT_ROOT
     / "data"
     / "sample"
     / "decision_outcomes.csv"
 )
 
+FEEDBACK_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "sample"
+    / "decision_feedback.csv"
+)
+
 
 # ============================================================
-# Load data
+# Load outcome data
 # ============================================================
 
-def load_data() -> pd.DataFrame:
+def load_outcomes() -> pd.DataFrame:
 
-    if not DATA_FILE.exists():
+    if not OUTCOME_FILE.exists():
         raise FileNotFoundError(
-            f"Outcome file not found:\n{DATA_FILE}"
+            f"Outcome file not found:\n{OUTCOME_FILE}"
         )
 
-    return pd.read_csv(
-        DATA_FILE
-    )
+    return pd.read_csv(OUTCOME_FILE)
 
 
 # ============================================================
-# Generate overall feedback
+# Generate feedback for one decision
 # ============================================================
 
 def generate_feedback(
-    df: pd.DataFrame,
-) -> Dict:
+    row,
+) -> dict:
 
-    prepared = prepare_outcome_data(
-        df
+    expected_cost = float(
+        row["expected_cost"]
     )
 
-    if len(prepared) == 0:
-
-        return {
-            "status": "no_data",
-            "message":
-                "No outcome data available.",
-        }
-
-    success_rate = (
-        prepared["action_success"].mean()
-        * 100
+    actual_cost = float(
+        row["actual_cost"]
     )
 
-    on_time_rate = (
-        prepared["on_time"].mean()
-        * 100
+    expected_days = float(
+        row["expected_delivery_days"]
     )
 
-    cost_saving = (
-        prepared["cost_saving"].sum()
+    actual_days = float(
+        row["actual_delivery_days"]
     )
 
-    # --------------------------------------------------------
-    # Overall status
-    # --------------------------------------------------------
+    cost_difference = (
+        actual_cost
+        - expected_cost
+    )
 
-    if success_rate >= 80:
+    delay_difference = (
+        actual_days
+        - expected_days
+    )
 
-        performance_status = "Good"
+    if (
+        actual_cost <= expected_cost
+        and actual_days <= expected_days
+    ):
+        feedback_status = "Positive"
 
-    elif success_rate >= 60:
-
-        performance_status = "Moderate"
+    elif (
+        actual_cost > expected_cost
+        and actual_days > expected_days
+    ):
+        feedback_status = "Negative"
 
     else:
-
-        performance_status = (
-            "Needs Improvement"
-        )
-
-    # --------------------------------------------------------
-    # Action-level performance
-    # --------------------------------------------------------
-
-    action_performance = (
-        prepared
-        .groupby("recommended_action")
-        .agg(
-            shipments=(
-                "Shipment_ID",
-                "nunique",
-            ),
-
-            success_rate=(
-                "action_success",
-                "mean",
-            ),
-
-            cost_saving=(
-                "cost_saving",
-                "sum",
-            ),
-        )
-        .reset_index()
-    )
-
-    action_performance[
-        "success_rate"
-    ] *= 100
-
-    underperforming_actions = (
-        action_performance[
-            action_performance[
-                "success_rate"
-            ] < 60
-        ][
-            "recommended_action"
-        ]
-        .tolist()
-    )
+        feedback_status = "Mixed"
 
     return {
-        "status": "success",
+        "Shipment_ID":
+            row["Shipment_ID"],
 
-        "performance_status":
-            performance_status,
+        "Recommended_Action":
+            row["recommended_action"],
 
-        "total_shipments":
-            len(prepared),
-
-        "action_success_rate":
-            round(
-                success_rate,
-                2,
+        "Selected_Action":
+            row.get(
+                "selected_action",
+                row["recommended_action"],
             ),
 
-        "on_time_delivery_rate":
-            round(
-                on_time_rate,
-                2,
-            ),
+        "Expected_Cost":
+            round(expected_cost, 2),
 
-        "total_cost_saving":
-            round(
-                float(cost_saving),
-                2,
-            ),
+        "Actual_Cost":
+            round(actual_cost, 2),
 
-        "underperforming_actions":
-            underperforming_actions,
+        "Cost_Difference":
+            round(cost_difference, 2),
+
+        "Expected_Delay_Days":
+            round(expected_days, 2),
+
+        "Actual_Delay_Days":
+            round(actual_days, 2),
+
+        "Delay_Difference":
+            round(delay_difference, 2),
+
+        "Outcome_Status":
+            row["outcome_status"],
+
+        "Feedback_Status":
+            feedback_status,
     }
 
 
 # ============================================================
-# Detailed action feedback
+# Generate feedback dataset
 # ============================================================
 
-def generate_action_feedback(
+def create_feedback(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
 
-    prepared = prepare_outcome_data(
-        df
-    )
+    required = [
+        "Shipment_ID",
+        "recommended_action",
+        "expected_cost",
+        "actual_cost",
+        "expected_delivery_days",
+        "actual_delivery_days",
+        "outcome_status",
+    ]
+
+    missing = [
+        column
+        for column in required
+        if column not in df.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            "Missing columns for feedback: "
+            + ", ".join(missing)
+        )
+
+    records = [
+        generate_feedback(row)
+        for _, row in df.iterrows()
+    ]
+
+    return pd.DataFrame(records)
+
+
+# ============================================================
+# Calculate action feedback
+# ============================================================
+
+def calculate_action_feedback(
+    feedback_df: pd.DataFrame,
+) -> pd.DataFrame:
 
     result = (
-        prepared
-        .groupby("recommended_action")
+        feedback_df
+        .groupby("Recommended_Action")
         .agg(
-            total_shipments=(
+            decisions=(
                 "Shipment_ID",
-                "nunique",
+                "count",
             ),
-
-            cost_saving=(
-                "cost_saving",
-                "sum",
-            ),
-
-            average_delay=(
-                "delay_days",
+            average_cost_difference=(
+                "Cost_Difference",
                 "mean",
             ),
-
-            on_time_rate=(
-                "on_time",
+            average_delay_difference=(
+                "Delay_Difference",
                 "mean",
             ),
-
-            success_rate=(
-                "action_success",
-                "mean",
+            positive_feedback=(
+                "Feedback_Status",
+                lambda x: (
+                    x == "Positive"
+                ).sum(),
+            ),
+            negative_feedback=(
+                "Feedback_Status",
+                lambda x: (
+                    x == "Negative"
+                ).sum(),
             ),
         )
         .reset_index()
     )
 
-    result["on_time_rate"] *= 100
+    result["positive_rate"] = (
+        result["positive_feedback"]
+        / result["decisions"]
+        * 100
+    )
 
-    result["success_rate"] *= 100
-
-    # --------------------------------------------------------
-    # Feedback classification
-    # --------------------------------------------------------
-
-    def classify(
-        value: float,
-    ) -> str:
-
-        if value >= 80:
-            return "Good performance"
-
-        if value >= 60:
-            return "Monitor performance"
-
-        return "Needs improvement"
-
-    result["feedback"] = (
-        result["success_rate"]
-        .apply(classify)
+    result["negative_rate"] = (
+        result["negative_feedback"]
+        / result["decisions"]
+        * 100
     )
 
     return result.round(2)
+
+
+# ============================================================
+# Calculate learning signals
+# ============================================================
+
+def calculate_learning_signals(
+    feedback_df: pd.DataFrame,
+) -> dict:
+
+    if len(feedback_df) == 0:
+        return {
+            "total_feedback": 0,
+            "positive_feedback_rate": 0.0,
+            "negative_feedback_rate": 0.0,
+            "average_cost_error": 0.0,
+            "average_delay_error": 0.0,
+            "recommended_weight_adjustment": 0.0,
+        }
+
+    positive_rate = (
+        (
+            feedback_df["Feedback_Status"]
+            == "Positive"
+        ).mean()
+        * 100
+    )
+
+    negative_rate = (
+        (
+            feedback_df["Feedback_Status"]
+            == "Negative"
+        ).mean()
+        * 100
+    )
+
+    average_cost_error = (
+        feedback_df["Cost_Difference"]
+        .abs()
+        .mean()
+    )
+
+    average_delay_error = (
+        feedback_df["Delay_Difference"]
+        .abs()
+        .mean()
+    )
+
+    # Simple learning signal.
+    # Positive value = increase caution/penalty.
+    # Negative value = reduce penalty.
+    if negative_rate > 50:
+        weight_adjustment = 0.10
+
+    elif positive_rate > 70:
+        weight_adjustment = -0.05
+
+    else:
+        weight_adjustment = 0.0
+
+    return {
+        "total_feedback":
+            int(len(feedback_df)),
+
+        "positive_feedback_rate":
+            round(
+                positive_rate,
+                2,
+            ),
+
+        "negative_feedback_rate":
+            round(
+                negative_rate,
+                2,
+            ),
+
+        "average_cost_error":
+            round(
+                average_cost_error,
+                2,
+            ),
+
+        "average_delay_error":
+            round(
+                average_delay_error,
+                2,
+            ),
+
+        "recommended_weight_adjustment":
+            weight_adjustment,
+    }
+
+
+# ============================================================
+# Save feedback
+# ============================================================
+
+def save_feedback(
+    feedback_df: pd.DataFrame,
+) -> None:
+
+    FEEDBACK_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    feedback_df.to_csv(
+        FEEDBACK_FILE,
+        index=False,
+    )
 
 
 # ============================================================
@@ -260,42 +342,56 @@ def generate_action_feedback(
 
 if __name__ == "__main__":
 
-    df = load_data()
+    outcomes = load_outcomes()
 
-    feedback = generate_feedback(
-        df
+    feedback = create_feedback(
+        outcomes
     )
 
-    detailed_feedback = (
-        generate_action_feedback(df)
+    save_feedback(
+        feedback
     )
 
-    print()
+    action_feedback = (
+        calculate_action_feedback(
+            feedback
+        )
+    )
+
+    learning = (
+        calculate_learning_signals(
+            feedback
+        )
+    )
+
     print("=" * 65)
     print(
-        "SUPPLY PRESCRIPT - CLOSED LOOP FEEDBACK"
+        "SUPPLY PRESCRIPT - DAY 12 FEEDBACK"
     )
     print("=" * 65)
 
     print()
 
-    for key, value in feedback.items():
+    print("LEARNING SIGNALS")
+    print("-" * 65)
 
+    for key, value in learning.items():
         print(
-            f"{key}: {value}"
+            f"{key.replace('_', ' ').title()}: "
+            f"{value}"
         )
 
     print()
-    print(
-        "ACTION LEVEL FEEDBACK"
-    )
+    print("ACTION FEEDBACK")
+    print("-" * 65)
 
     print(
-        "-" * 65
-    )
-
-    print(
-        detailed_feedback.to_string(
+        action_feedback.to_string(
             index=False
         )
+    )
+
+    print()
+    print(
+        f"Feedback file: {FEEDBACK_FILE}"
     )

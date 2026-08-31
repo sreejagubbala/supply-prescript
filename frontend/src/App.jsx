@@ -7,6 +7,7 @@ import Suppliers from './pages/Suppliers'
 import Analytics from './pages/Analytics'
 import DecisionROI from './pages/DecisionROI'
 import DecisionHistory from './pages/DecisionHistory'
+import Feedback from './pages/Feedback'
 
 function App() {
   return (
@@ -23,6 +24,8 @@ function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/decision-roi" element={<DecisionROI />} />
             <Route path="/decision-history" element={<DecisionHistory />} />
+            <Route path="/feedback"element={<Feedback />}
+        />
           </Routes>
         </div>
       </div>
