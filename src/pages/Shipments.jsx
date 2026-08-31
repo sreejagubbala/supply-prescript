@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Search, X, ArrowUp, ArrowDown, Download } from 'lucide-react'
+import { fetchShipments } from '../api/shipments'
 
 const mockShipments = [
   { id: 'SHP-001', origin: 'Chennai', destination: 'Bengaluru', status: 'On-Time', eta: '2026-08-28', riskScore: 12 },
@@ -88,10 +89,14 @@ function Shipments() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  useEffect(() => {
-    setShipments(mockShipments)
+    useEffect(() => {
+    fetchShipments()
+      .then((data) => setShipments(data))
+      .catch(() => {
+        console.warn('Backend not available yet — using mock data')
+        setShipments(mockShipments)
+      })
   }, [])
-
   const filtered = shipments.filter((s) => {
     const matchesStatus = statusFilter === 'All' || s.status === statusFilter
     const matchesSearch =
