@@ -1,279 +1,322 @@
-import os
+from datetime import date
+from pathlib import Path
+from typing import Optional
+
 import pandas as pd
 
 
 # ============================================================
 # SUPPLY PRESCRIPT
-# Day 8 - Decision Tracking Logic
 # Member 5 - Closed Loop & Analytics
+# Decision Tracking
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-DECISION_FILE = os.path.join(
-    BASE_DIR,
-    "data",
-    "sample",
-    "decision_outcomes.csv"
+PROJECT_ROOT = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
 )
 
-SHIPMENT_FILE = os.path.join(
-    BASE_DIR,
-    "data",
-    "sample",
-    "sample_shipments.csv"
+DATA_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "sample"
+    / "decision_outcomes.csv"
 )
 
 
 # ============================================================
-# Load data
+# Load decision data
 # ============================================================
 
-def load_decision_data():
-    """Load existing decision/outcome data."""
+def load_decisions(
+    file_path: Optional[Path] = None,
+) -> pd.DataFrame:
 
-    if not os.path.exists(DECISION_FILE):
+    path = file_path or DATA_FILE
+
+    if not path.exists():
         raise FileNotFoundError(
-            f"Decision file not found: {DECISION_FILE}"
+            f"Decision file not found:\n{path}"
         )
 
-    return pd.read_csv(DECISION_FILE)
-
-
-def load_shipment_data():
-    """Load existing Week 1 shipment data."""
-
-    if not os.path.exists(SHIPMENT_FILE):
-        raise FileNotFoundError(
-            f"Shipment file not found: {SHIPMENT_FILE}"
-        )
-
-    return pd.read_csv(SHIPMENT_FILE)
+    return pd.read_csv(path)
 
 
 # ============================================================
-# Helper function
+# Create decision ID
 # ============================================================
 
-def find_column(df, possible_names):
+def create_decision_id(
+    shipment_id: str,
+    existing_ids=None,
+) -> str:
     """
-    Find a column using several possible column names.
-    This makes the code work with slightly different
-    CSV naming conventions.
+    Create a simple decision identifier.
+
+    Example:
+        DEC-SHP-1001
     """
 
-    normalized = {
-        str(column).strip().lower().replace(" ", "_"): column
-        for column in df.columns
+    decision_id = (
+        f"DEC-{str(shipment_id).strip()}"
+    )
+
+    if existing_ids is None:
+        return decision_id
+
+    existing_ids = {
+        str(value)
+        for value in existing_ids
     }
 
-    for name in possible_names:
+    if decision_id not in existing_ids:
+        return decision_id
 
-        key = name.lower().replace(" ", "_")
+    counter = 2
 
-        if key in normalized:
-            return normalized[key]
+    while (
+        f"{decision_id}-{counter}"
+        in existing_ids
+    ):
+        counter += 1
 
-    return None
+    return (
+        f"{decision_id}-{counter}"
+    )
 
 
 # ============================================================
-# Create decision record
+# Track a decision
 # ============================================================
 
-def create_decision(
-    decision_id,
-    shipment_id,
-    recommended_action,
-    selected_action,
-    expected_cost,
-    expected_delay
-):
+def track_decision(
+    shipment_id: str,
+    recommended_action: str,
+    expected_cost: float,
+    expected_delivery_days: float,
+    selected_action: Optional[str] = None,
+    decision_date: Optional[str] = None,
+    file_path: Optional[Path] = None,
+) -> dict:
     """
-    Create a new decision record.
+    Record a business decision.
+
+    If selected_action is not supplied,
+    the recommended action is used.
+
+    Manager override is automatically detected.
     """
 
-    decision = {
+    path = file_path or DATA_FILE
+
+    if path.exists():
+        df = pd.read_csv(path)
+    else:
+        df = pd.DataFrame()
+
+    existing_ids = (
+        df["Decision_ID"].tolist()
+        if "Decision_ID" in df.columns
+        else []
+    )
+
+    decision_id = create_decision_id(
+        shipment_id,
+        existing_ids,
+    )
+
+    if selected_action is None:
+        selected_action = recommended_action
+
+    if decision_date is None:
+        decision_date = date.today().isoformat()
+
+    manager_override = (
+        str(selected_action).strip()
+        !=
+        str(recommended_action).strip()
+    )
+
+    record = {
         "Decision_ID": decision_id,
         "Shipment_ID": shipment_id,
+        "Decision_Date": decision_date,
         "Recommended_Action": recommended_action,
         "Selected_Action": selected_action,
-        "Expected_Cost": expected_cost,
-        "Expected_Delay_Days": expected_delay,
-        "Decision_Status": "Executed"
+        "Expected_Cost": round(
+            float(expected_cost),
+            2,
+        ),
+        "Expected_Delay_Days": round(
+            float(expected_delivery_days),
+            2,
+        ),
+        "Manager_Override": manager_override,
     }
 
-    return decision
+    return record
 
 
 # ============================================================
-# Evaluate decision
+# Add decision to CSV
 # ============================================================
 
-def evaluate_decision(
-    expected_cost,
-    actual_cost,
-    expected_delay,
-    actual_delay
-):
-    """
-    Compare expected and actual decision results.
-    """
+def save_decision(
+    record: dict,
+    file_path: Optional[Path] = None,
+) -> pd.DataFrame:
 
-    cost_difference = None
-    delay_difference = None
+    path = file_path or DATA_FILE
 
-    if pd.notna(expected_cost) and pd.notna(actual_cost):
-        cost_difference = actual_cost - expected_cost
+    path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    if pd.notna(expected_delay) and pd.notna(actual_delay):
-        delay_difference = actual_delay - expected_delay
+    if path.exists():
+        df = pd.read_csv(path)
+    else:
+        df = pd.DataFrame()
 
-    # --------------------------------------------------------
-    # Determine decision success
-    # --------------------------------------------------------
+    record_df = pd.DataFrame(
+        [record]
+    )
 
-    if cost_difference is not None and delay_difference is not None:
+    # Avoid duplicate Decision_ID
+    if (
+        "Decision_ID" in df.columns
+        and "Decision_ID" in record_df.columns
+    ):
+        df = df[
+            df["Decision_ID"].astype(str)
+            !=
+            str(record["Decision_ID"])
+        ]
 
-        if cost_difference <= 0 and delay_difference <= 0:
-            success = "Successful"
+    result = pd.concat(
+        [
+            df,
+            record_df,
+        ],
+        ignore_index=True,
+    )
 
-        elif cost_difference <= 0 or delay_difference <= 0:
-            success = "Partially Successful"
+    result.to_csv(
+        path,
+        index=False,
+    )
 
-        else:
-            success = "Unsuccessful"
+    return result
 
-    elif cost_difference is not None:
 
-        if cost_difference <= 0:
-            success = "Successful"
-        else:
-            success = "Unsuccessful"
+# ============================================================
+# Manager override analysis
+# ============================================================
 
-    elif delay_difference is not None:
+def calculate_override_rate(
+    df: pd.DataFrame,
+) -> float:
 
-        if delay_difference <= 0:
-            success = "Successful"
-        else:
-            success = "Unsuccessful"
+    if len(df) == 0:
+        return 0.0
+
+    if (
+        "Recommended_Action" not in df.columns
+        or "Selected_Action" not in df.columns
+    ):
+        return 0.0
+
+    overrides = (
+        df["Recommended_Action"]
+        .astype(str)
+        .str.strip()
+        !=
+        df["Selected_Action"]
+        .astype(str)
+        .str.strip()
+    ).sum()
+
+    return round(
+        overrides / len(df) * 100,
+        2,
+    )
+
+
+# ============================================================
+# Decision summary
+# ============================================================
+
+def decision_summary(
+    df: pd.DataFrame,
+) -> dict:
+
+    total = len(df)
+
+    if total == 0:
+        return {
+            "total_decisions": 0,
+            "manager_overrides": 0,
+            "override_rate": 0.0,
+        }
+
+    if (
+        "Recommended_Action" in df.columns
+        and "Selected_Action" in df.columns
+    ):
+
+        overrides = (
+            df["Recommended_Action"]
+            .astype(str)
+            .str.strip()
+            !=
+            df["Selected_Action"]
+            .astype(str)
+            .str.strip()
+        ).sum()
 
     else:
-        success = "Not Evaluated"
+        overrides = 0
 
     return {
-        "Cost_Difference": cost_difference,
-        "Delay_Difference": delay_difference,
-        "Decision_Success": success
+        "total_decisions": int(total),
+        "manager_overrides": int(
+            overrides
+        ),
+        "override_rate": round(
+            overrides / total * 100,
+            2,
+        ),
     }
 
 
 # ============================================================
-# Track existing decisions
-# ============================================================
-
-def track_decisions():
-
-    decisions = load_decision_data()
-    shipments = load_shipment_data()
-
-    print("\n==========================================")
-    print("SUPPLY PRESCRIPT - DECISION TRACKING")
-    print("==========================================")
-
-    print("\nDecision/Outcome records:")
-    print(f"Rows: {len(decisions)}")
-
-    print("\nShipment records:")
-    print(f"Rows: {len(shipments)}")
-
-    # --------------------------------------------------------
-    # Find Shipment_ID columns
-    # --------------------------------------------------------
-
-    decision_shipment_col = find_column(
-        decisions,
-        ["Shipment_ID", "shipment_id", "Shipment ID"]
-    )
-
-    shipment_id_col = find_column(
-        shipments,
-        ["Shipment_ID", "shipment_id", "Shipment ID"]
-    )
-
-    # --------------------------------------------------------
-    # Connect decision data with Week 1 shipment data
-    # --------------------------------------------------------
-
-    if decision_shipment_col and shipment_id_col:
-
-        merged = decisions.merge(
-            shipments,
-            left_on=decision_shipment_col,
-            right_on=shipment_id_col,
-            how="left",
-            suffixes=("_decision", "_shipment")
-        )
-
-        print("\nDecision → Shipment connection successful.")
-
-    else:
-
-        merged = decisions.copy()
-
-        print(
-            "\nShipment_ID column was not found in "
-            "one of the files."
-        )
-
-    return merged
-
-
-# ============================================================
-# Display decision lifecycle
-# ============================================================
-
-def show_decision_lifecycle():
-
-    print("\n==========================================")
-    print("DECISION LIFECYCLE")
-    print("==========================================")
-
-    print("""
-Shipment
-   ↓
-Prediction
-   ↓
-Recommended Action
-   ↓
-Manager Selects Action
-   ↓
-Decision Logged
-   ↓
-Action Executed
-   ↓
-Actual Outcome
-   ↓
-Expected vs Actual
-   ↓
-Decision Success
-""")
-
-
-# ============================================================
-# Main
+# Test
 # ============================================================
 
 if __name__ == "__main__":
 
-    show_decision_lifecycle()
+    print("=" * 60)
+    print("SUPPLY PRESCRIPT")
+    print("DECISION TRACKING")
+    print("=" * 60)
 
-    result = track_decisions()
+    if DATA_FILE.exists():
 
-    print("\n==========================================")
-    print("TRACKED DECISION DATA")
-    print("==========================================")
+        decisions = load_decisions()
 
-    print(result.head(10).to_string(index=False))
+        print(
+            f"Decisions loaded: {len(decisions)}"
+        )
 
-    print("\nDay 8 decision tracking completed.")
+        print(
+            decision_summary(decisions)
+        )
+
+    else:
+
+        print(
+            "decision_outcomes.csv not found."
+        )
