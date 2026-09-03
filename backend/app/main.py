@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import shipments
+from .routes import database
 
 
 app = FastAPI(
@@ -11,77 +11,14 @@ app = FastAPI(
 )
 
 
-# -------------------------
-# CORS Configuration
-# -------------------------
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# -------------------------
-# Routers
-# -------------------------
-
 app.include_router(
     shipments.router
 )
 
+app.include_router(
+    database.router
+)
 
-# -------------------------
-# Sample Operations Summary
-# -------------------------
-
-@app.get("/api/operations/summary")
-def get_operations_summary():
-
-    return {
-        "totalShipments": 128,
-        "onTimeCount": 96,
-        "delayedCount": 32,
-        "trendData": [
-            {
-                "day": "Mon",
-                "delays": 4
-            },
-            {
-                "day": "Tue",
-                "delays": 6
-            },
-            {
-                "day": "Wed",
-                "delays": 3
-            },
-            {
-                "day": "Thu",
-                "delays": 7
-            },
-            {
-                "day": "Fri",
-                "delays": 5
-            },
-            {
-                "day": "Sat",
-                "delays": 4
-            },
-            {
-                "day": "Sun",
-                "delays": 3
-            }
-        ]
-    }
-
-
-# -------------------------
-# Root
-# -------------------------
 
 @app.get("/")
 def root():
