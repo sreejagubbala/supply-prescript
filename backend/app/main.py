@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from .routes import shipments
 from .routes import database
+from .routes import suppliers
 
 
 app = FastAPI(
@@ -17,6 +18,10 @@ app.include_router(
 
 app.include_router(
     database.router
+)
+
+app.include_router(
+    suppliers.router
 )
 
 
