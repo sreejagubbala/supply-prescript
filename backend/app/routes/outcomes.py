@@ -12,7 +12,6 @@ from fastapi import APIRouter, HTTPException
 
 
 router = APIRouter(
-    prefix="/outcomes",
     tags=["Outcomes"],
 )
 
