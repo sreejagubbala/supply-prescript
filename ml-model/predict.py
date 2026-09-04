@@ -5,26 +5,44 @@ from config import DURATION_MODEL_PATH, MODEL_PATH
 from feature_engineering import create_features
 
 
+DELAY_THRESHOLD = 0.35
+HIGH_RISK_THRESHOLD = 0.70
+
+
 def predict_delay(shipment):
     """
+    Predict shipment delay risk and shipping duration.
+
     shipment: dictionary containing shipment details
-    returns: delay prediction, probability, and risk level
+    returns: delay prediction, probability, risk level,
+             and predicted shipping days
     """
 
     input_df = pd.DataFrame([shipment])
 
-    features = create_features(input_df, include_target=False)
+    features = create_features(
+        input_df,
+        include_target=False
+    )
 
     delay_pipeline = joblib.load(MODEL_PATH)
     duration_pipeline = joblib.load(DURATION_MODEL_PATH)
 
-    delay_probability = float(delay_pipeline.predict_proba(features)[0][1])
-    predicted_shipping_days = float(duration_pipeline.predict(features)[0])
-    predicted_delay = int(delay_probability >= 0.50)
+    delay_probability = float(
+        delay_pipeline.predict_proba(features)[0][1]
+    )
 
-    if delay_probability >= 0.70:
+    predicted_shipping_days = float(
+        duration_pipeline.predict(features)[0]
+    )
+
+    predicted_delay = int(
+        delay_probability >= DELAY_THRESHOLD
+    )
+
+    if delay_probability >= HIGH_RISK_THRESHOLD:
         risk_level = "High"
-    elif delay_probability >= 0.40:
+    elif delay_probability >= DELAY_THRESHOLD:
         risk_level = "Medium"
     else:
         risk_level = "Low"
@@ -33,7 +51,10 @@ def predict_delay(shipment):
         "predicted_delay": predicted_delay,
         "delay_probability": round(delay_probability, 4),
         "risk_level": risk_level,
-        "predicted_shipping_days": round(predicted_shipping_days, 2),
+        "predicted_shipping_days": round(
+            predicted_shipping_days,
+            2
+        ),
     }
 
 

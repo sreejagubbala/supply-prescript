@@ -21,3 +21,5 @@ data/processed/
 *.xlsx
 .env
 ml-model/models/*.pkl
+
+.venv/
