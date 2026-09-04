@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routes import shipments
 from .routes import database
 from .routes import suppliers
+from .routes import operations
 
 
 app = FastAPI(
@@ -14,7 +15,7 @@ app = FastAPI(
 
 
 # -------------------------
-# CORS Configuration
+# CORS
 # -------------------------
 
 origins = [
@@ -33,7 +34,7 @@ app.add_middleware(
 
 
 # -------------------------
-# API Routes
+# Routes
 # -------------------------
 
 app.include_router(
@@ -48,9 +49,13 @@ app.include_router(
     suppliers.router
 )
 
+app.include_router(
+    operations.router
+)
+
 
 # -------------------------
-# Root Endpoint
+# Root
 # -------------------------
 
 @app.get("/")
@@ -62,7 +67,7 @@ def root():
 
 
 # -------------------------
-# Health Endpoint
+# Health
 # -------------------------
 
 @app.get("/health")
