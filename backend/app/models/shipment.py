@@ -43,15 +43,40 @@ class Shipment(Base):
         nullable=False
     )
 
-    historical_lead_time = Column(Float)
+    historical_lead_time = Column(
+        Float
+    )
 
-    current_lead_time = Column(Float)
+    current_lead_time = Column(
+        Float
+    )
 
-    inventory_level = Column(Float)
+    inventory_level = Column(
+        Float
+    )
 
     status = Column(
         String(50),
         default="Pending"
+    )
+
+    # Frontend integration fields
+
+    origin = Column(
+        String(150)
+    )
+
+    destination = Column(
+        String(150)
+    )
+
+    eta = Column(
+        String(50)
+    )
+
+    risk_score = Column(
+        Float,
+        default=0.0
     )
 
     created_at = Column(
