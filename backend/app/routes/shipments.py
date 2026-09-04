@@ -3,7 +3,10 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.shipment import Shipment
-from ..schemas.shipment import ShipmentCreate, ShipmentResponse
+from ..schemas.shipment import (
+    ShipmentCreate,
+    ShipmentResponse
+)
 
 
 router = APIRouter(
@@ -26,7 +29,17 @@ def get_shipments(
         .all()
     )
 
-    return shipments
+    return [
+        {
+            "id": shipment.id,
+            "origin": shipment.origin,
+            "destination": shipment.destination,
+            "status": shipment.status,
+            "eta": shipment.eta,
+            "riskScore": shipment.risk_score
+        }
+        for shipment in shipments
+    ]
 
 
 @router.get(
@@ -53,7 +66,14 @@ def get_shipment(
             detail="Shipment not found"
         )
 
-    return shipment
+    return {
+        "id": shipment.id,
+        "origin": shipment.origin,
+        "destination": shipment.destination,
+        "status": shipment.status,
+        "eta": shipment.eta,
+        "riskScore": shipment.risk_score
+    }
 
 
 @router.post(
@@ -90,7 +110,11 @@ def create_shipment(
         historical_lead_time=shipment_data.historical_lead_time,
         current_lead_time=shipment_data.current_lead_time,
         inventory_level=shipment_data.inventory_level,
-        status=shipment_data.status
+        status=shipment_data.status,
+        origin=shipment_data.origin,
+        destination=shipment_data.destination,
+        eta=shipment_data.eta,
+        risk_score=shipment_data.risk_score
     )
 
     db.add(shipment)
@@ -99,4 +123,11 @@ def create_shipment(
 
     db.refresh(shipment)
 
-    return shipment
+    return {
+        "id": shipment.id,
+        "origin": shipment.origin,
+        "destination": shipment.destination,
+        "status": shipment.status,
+        "eta": shipment.eta,
+        "riskScore": shipment.risk_score
+    }
