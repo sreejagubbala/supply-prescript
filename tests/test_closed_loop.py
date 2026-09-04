@@ -49,7 +49,7 @@ from performance_metrics import (
     metrics_by_region,
 )
 
-from closed_loop_analysis import (
+from calculate_roi import (
     calculate_roi,
     predicted_vs_actual_cost,
     predicted_vs_actual_delivery,
@@ -62,7 +62,7 @@ from closed_loop_analysis import (
     action_learning_summary,
 )
 
-from decision_tracking import (
+from learning_pipeline import (
     create_decision_id,
     track_decision,
     save_decision,

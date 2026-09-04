@@ -1,78 +1,97 @@
+"""
+Supply Prescript
+Member 5 - Performance Metrics
+
+Calculates:
+
+- Total decisions
+- Expected cost
+- Actual cost
+- Savings
+- ROI
+- Success rate
+- On-time rate
+- Cost variance
+- Delay variance
+- Metrics by action
+- Metrics by shipping mode
+- Metrics by market
+- Metrics by region
+"""
+
+from pathlib import Path
 from typing import Dict
 
 import pandas as pd
 
 
 # ============================================================
-# SUPPLY PRESCRIPT
-# Member 5 - Closed Loop & Analytics
-# Performance Metrics
+# PATHS
 # ============================================================
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# ============================================================
-# Required source columns
-# ============================================================
-
-SOURCE_COLUMNS = [
-    "Shipment_ID",
-    "Shipment_Date",
-    "Shipping_Mode",
-    "Days_for_shipment_scheduled",
-    "Category_Name",
-    "Market",
-    "Order_Region",
-    "Customer_Country",
-    "Customer_City",
-    "Order_Item_Quantity",
-    "Sales_per_customer",
-    "Order_Item_Total",
-    "Order_Profit_Per_Order",
-    "Late_delivery_risk",
-]
+OUTCOME_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "processed"
+    / "decision_outcomes.csv"
+)
 
 
 # ============================================================
-# Required outcome columns
+# REQUIRED COLUMNS
 # ============================================================
 
 OUTCOME_COLUMNS = [
+    "Decision_ID",
     "Shipment_ID",
-    "Shipping_Mode",
-    "Days_for_shipment_scheduled",
-    "Late_delivery_risk",
-    "recommended_action",
-    "expected_delivery_days",
-    "actual_delivery_days",
-    "expected_cost",
-    "actual_cost",
-    "delivery_status",
-    "outcome_status",
+    "Decision_Date",
+    "Recommended_Action",
+    "Selected_Action",
+    "Expected_Cost",
+    "Actual_Cost",
+    "Cost_Variance",
+    "Cost_Saving",
+    "Cost_Saving_Percentage",
+    "Expected_Delay_Days",
+    "Actual_Delay_Days",
+    "Delay_Variance_Days",
+    "On_Time",
+    "Action_Success",
 ]
 
 
 # ============================================================
-# Validation
+# LOAD DATA
 # ============================================================
 
-def validate_source_data(df: pd.DataFrame) -> None:
-    """Validate the original shipment dataset."""
+def load_outcome_data(
+    file_path: Path = OUTCOME_FILE,
+) -> pd.DataFrame:
+    """
+    Load decision outcome data.
+    """
 
-    missing = [
-        column
-        for column in SOURCE_COLUMNS
-        if column not in df.columns
-    ]
-
-    if missing:
-        raise ValueError(
-            "Missing source columns: "
-            + ", ".join(missing)
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Outcome file not found: {file_path}"
         )
 
+    df = pd.read_csv(file_path)
 
-def validate_outcome_data(df: pd.DataFrame) -> None:
-    """Validate the closed-loop outcome dataset."""
+    validate_outcome_data(df)
+
+    return df
+
+
+# ============================================================
+# VALIDATION
+# ============================================================
+
+def validate_outcome_data(
+    df: pd.DataFrame,
+) -> None:
 
     missing = [
         column
@@ -88,447 +107,421 @@ def validate_outcome_data(df: pd.DataFrame) -> None:
 
 
 # ============================================================
-# Prepare outcome data
+# BOOLEAN NORMALIZATION
+# ============================================================
+
+def normalize_boolean(
+    series: pd.Series,
+) -> pd.Series:
+
+    return (
+        series
+        .astype(str)
+        .str.lower()
+        .map(
+            {
+                "true": True,
+                "false": False,
+                "1": True,
+                "0": False,
+                "yes": True,
+                "no": False,
+            }
+        )
+        .fillna(False)
+    )
+
+
+# ============================================================
+# PREPARE DATA
 # ============================================================
 
 def prepare_outcome_data(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Prepare decision/outcome data and calculate
-    derived closed-loop metrics.
-    """
 
-    validate_outcome_data(df)
-
-    result = df.copy()
+    df = df.copy()
 
     numeric_columns = [
-        "Days_for_shipment_scheduled",
-        "Late_delivery_risk",
-        "expected_delivery_days",
-        "actual_delivery_days",
-        "expected_cost",
-        "actual_cost",
+        "Expected_Cost",
+        "Actual_Cost",
+        "Cost_Variance",
+        "Cost_Saving",
+        "Cost_Saving_Percentage",
+        "Expected_Delay_Days",
+        "Actual_Delay_Days",
+        "Delay_Variance_Days",
     ]
 
     for column in numeric_columns:
-        result[column] = pd.to_numeric(
-            result[column],
+        df[column] = pd.to_numeric(
+            df[column],
             errors="coerce",
         )
 
-    # --------------------------------------------------------
-    # Cost saving
-    # --------------------------------------------------------
-
-    result["cost_saving"] = (
-        result["expected_cost"]
-        - result["actual_cost"]
+    df["On_Time"] = normalize_boolean(
+        df["On_Time"]
     )
 
-    # --------------------------------------------------------
-    # Cost saving percentage
-    # --------------------------------------------------------
+    df["Action_Success"] = normalize_boolean(
+        df["Action_Success"]
+    )
 
-    result["cost_saving_percentage"] = 0.0
+    # Recalculate values to protect against
+    # stale or manually modified CSV values.
 
-    valid_cost = result["expected_cost"] != 0
+    df["Cost_Variance"] = (
+        df["Actual_Cost"]
+        - df["Expected_Cost"]
+    )
 
-    result.loc[
-        valid_cost,
-        "cost_saving_percentage",
-    ] = (
-        result.loc[
-            valid_cost,
-            "cost_saving",
-        ]
-        / result.loc[
-            valid_cost,
-            "expected_cost",
-        ]
+    df["Cost_Saving"] = (
+        df["Expected_Cost"]
+        - df["Actual_Cost"]
+    )
+
+    df["Cost_Saving_Percentage"] = (
+        df["Cost_Saving"]
+        / df["Expected_Cost"]
+        .replace(0, pd.NA)
         * 100
     )
 
-    # --------------------------------------------------------
-    # Delivery delay
-    #
-    # Positive = delayed
-    # Zero = on expected time
-    # Negative = early
-    # --------------------------------------------------------
-
-    result["delay_days"] = (
-        result["actual_delivery_days"]
-        - result["expected_delivery_days"]
+    df["Delay_Variance_Days"] = (
+        df["Actual_Delay_Days"]
+        - df["Expected_Delay_Days"]
     )
 
-    # --------------------------------------------------------
-    # On-time delivery
-    # --------------------------------------------------------
-
-    result["on_time"] = (
-        result["actual_delivery_days"]
-        <= result["expected_delivery_days"]
-    )
-
-    # --------------------------------------------------------
-    # Action success
-    # --------------------------------------------------------
-
-    result["action_success"] = (
-        result["actual_cost"]
-        <= result["expected_cost"]
-    ) & (
-        result["actual_delivery_days"]
-        <= result["expected_delivery_days"]
-    )
-
-    # --------------------------------------------------------
-    # Risk prediction correctness
-    # --------------------------------------------------------
-
-    result["risk_prediction_correct"] = (
-        (
-            result["Late_delivery_risk"] == 1
-        )
-        ==
-        (
-            result["delivery_status"] == "Delayed"
-        )
-    )
-
-    return result
+    return df
 
 
 # ============================================================
-# Basic KPIs
+# BASIC KPIs
 # ============================================================
 
-def total_shipments(df: pd.DataFrame) -> int:
-    return int(
-        df["Shipment_ID"].nunique()
+def total_decisions(df: pd.DataFrame) -> int:
+    return int(len(df))
+
+
+def total_expected_cost(
+    df: pd.DataFrame,
+) -> float:
+    return round(
+        df["Expected_Cost"].sum(),
+        2,
     )
 
 
-def total_expected_cost(df: pd.DataFrame) -> float:
-    return float(
-        df["expected_cost"].sum()
+def total_actual_cost(
+    df: pd.DataFrame,
+) -> float:
+    return round(
+        df["Actual_Cost"].sum(),
+        2,
     )
 
 
-def total_actual_cost(df: pd.DataFrame) -> float:
-    return float(
-        df["actual_cost"].sum()
+def total_savings(
+    df: pd.DataFrame,
+) -> float:
+
+    return round(
+        (
+            df["Expected_Cost"].sum()
+            - df["Actual_Cost"].sum()
+        ),
+        2,
     )
 
 
-def total_cost_saving(df: pd.DataFrame) -> float:
-    return float(
-        df["cost_saving"].sum()
-    )
+def savings_percentage(
+    df: pd.DataFrame,
+) -> float:
 
-
-def average_cost_saving(df: pd.DataFrame) -> float:
-    if len(df) == 0:
-        return 0.0
-
-    return float(
-        df["cost_saving"].mean()
-    )
-
-
-def cost_saving_percentage(df: pd.DataFrame) -> float:
-    expected = df["expected_cost"].sum()
+    expected = df["Expected_Cost"].sum()
 
     if expected == 0:
         return 0.0
 
-    saving = df["cost_saving"].sum()
-
-    return float(
-        saving / expected * 100
+    return round(
+        total_savings(df)
+        / expected
+        * 100,
+        2,
     )
 
 
-# ============================================================
-# Delivery KPIs
-# ============================================================
+def roi_percentage(
+    df: pd.DataFrame,
+) -> float:
 
-def average_delivery_time(df: pd.DataFrame) -> float:
+    expected = df["Expected_Cost"].sum()
+
+    if expected == 0:
+        return 0.0
+
+    savings = total_savings(df)
+
+    return round(
+        savings
+        / expected
+        * 100,
+        2,
+    )
+
+
+def success_rate(
+    df: pd.DataFrame,
+) -> float:
+
     if len(df) == 0:
         return 0.0
 
-    return float(
-        df["actual_delivery_days"].mean()
+    return round(
+        df["Action_Success"].mean()
+        * 100,
+        2,
     )
 
 
-def average_delay(df: pd.DataFrame) -> float:
+def on_time_rate(
+    df: pd.DataFrame,
+) -> float:
+
     if len(df) == 0:
         return 0.0
 
-    return float(
-        df["delay_days"].mean()
+    return round(
+        df["On_Time"].mean()
+        * 100,
+        2,
     )
 
 
-def total_delayed_shipments(df: pd.DataFrame) -> int:
-    return int(
-        (
-            df["delivery_status"]
-            == "Delayed"
-        ).sum()
-    )
+def average_cost_variance(
+    df: pd.DataFrame,
+) -> float:
 
-
-def on_time_delivery_rate(df: pd.DataFrame) -> float:
     if len(df) == 0:
         return 0.0
 
-    return float(
-        df["on_time"].mean() * 100
+    return round(
+        df["Cost_Variance"].mean(),
+        2,
     )
 
 
-# ============================================================
-# Decision KPIs
-# ============================================================
+def average_delay_variance(
+    df: pd.DataFrame,
+) -> float:
 
-def successful_actions(df: pd.DataFrame) -> int:
-    return int(
-        df["action_success"].sum()
-    )
-
-
-def action_success_rate(df: pd.DataFrame) -> float:
     if len(df) == 0:
         return 0.0
 
-    return float(
-        df["action_success"].mean() * 100
+    return round(
+        df["Delay_Variance_Days"].mean(),
+        2,
     )
 
 
 # ============================================================
-# Risk KPIs
-# ============================================================
-
-def high_risk_shipments(df: pd.DataFrame) -> int:
-    return int(
-        (
-            df["Late_delivery_risk"] == 1
-        ).sum()
-    )
-
-
-def risk_prediction_accuracy(df: pd.DataFrame) -> float:
-    if len(df) == 0:
-        return 0.0
-
-    return float(
-        df["risk_prediction_correct"].mean()
-        * 100
-    )
-
-
-# ============================================================
-# Overall metrics
+# COMPLETE KPI CALCULATION
 # ============================================================
 
 def calculate_metrics(
     df: pd.DataFrame,
 ) -> Dict:
 
-    prepared = prepare_outcome_data(df)
+    df = prepare_outcome_data(df)
 
     return {
-        "total_shipments": total_shipments(
-            prepared
-        ),
+        "total_decisions":
+            total_decisions(df),
 
-        "total_expected_cost": round(
-            total_expected_cost(prepared),
-            2,
-        ),
+        "total_expected_cost":
+            total_expected_cost(df),
 
-        "total_actual_cost": round(
-            total_actual_cost(prepared),
-            2,
-        ),
+        "total_actual_cost":
+            total_actual_cost(df),
 
-        "total_cost_saving": round(
-            total_cost_saving(prepared),
-            2,
-        ),
+        "total_savings":
+            total_savings(df),
 
-        "average_cost_saving": round(
-            average_cost_saving(prepared),
-            2,
-        ),
+        "savings_percentage":
+            savings_percentage(df),
 
-        "cost_saving_percentage": round(
-            cost_saving_percentage(prepared),
-            2,
-        ),
+        "roi_percentage":
+            roi_percentage(df),
 
-        "average_delivery_time": round(
-            average_delivery_time(prepared),
-            2,
-        ),
+        "success_rate":
+            success_rate(df),
 
-        "average_delay": round(
-            average_delay(prepared),
-            2,
-        ),
+        "on_time_rate":
+            on_time_rate(df),
 
-        "total_delayed_shipments":
-            total_delayed_shipments(prepared),
+        "average_cost_variance":
+            average_cost_variance(df),
 
-        "on_time_delivery_rate": round(
-            on_time_delivery_rate(prepared),
-            2,
-        ),
-
-        "successful_actions":
-            successful_actions(prepared),
-
-        "action_success_rate": round(
-            action_success_rate(prepared),
-            2,
-        ),
-
-        "high_risk_shipments":
-            high_risk_shipments(prepared),
-
-        "risk_prediction_accuracy": round(
-            risk_prediction_accuracy(prepared),
-            2,
-        ),
+        "average_delay_variance_days":
+            average_delay_variance(df),
     }
 
 
 # ============================================================
-# Generic grouped metrics
+# GROUPED METRICS
 # ============================================================
 
-def _group_metrics(
+def grouped_metrics(
     df: pd.DataFrame,
     group_column: str,
 ) -> pd.DataFrame:
 
-    prepared = prepare_outcome_data(df)
+    df = prepare_outcome_data(df)
 
-    result = (
-        prepared
-        .groupby(group_column)
+    if group_column not in df.columns:
+        raise ValueError(
+            f"Column '{group_column}' does not exist."
+        )
+
+    grouped = (
+        df.groupby(group_column)
         .agg(
-            shipments=(
-                "Shipment_ID",
-                "nunique",
+            Decisions=(
+                "Decision_ID",
+                "count",
             ),
 
-            expected_cost=(
-                "expected_cost",
+            Expected_Cost=(
+                "Expected_Cost",
                 "sum",
             ),
 
-            actual_cost=(
-                "actual_cost",
+            Actual_Cost=(
+                "Actual_Cost",
                 "sum",
             ),
 
-            cost_saving=(
-                "cost_saving",
+            Savings=(
+                "Cost_Saving",
                 "sum",
             ),
 
-            average_delay=(
-                "delay_days",
+            Average_Cost_Variance=(
+                "Cost_Variance",
                 "mean",
             ),
 
-            on_time_rate=(
-                "on_time",
+            Average_Delay_Variance=(
+                "Delay_Variance_Days",
                 "mean",
             ),
 
-            success_rate=(
-                "action_success",
+            Success_Rate=(
+                "Action_Success",
+                "mean",
+            ),
+
+            On_Time_Rate=(
+                "On_Time",
                 "mean",
             ),
         )
         .reset_index()
     )
 
-    result["on_time_rate"] *= 100
-    result["success_rate"] *= 100
-
-    return result.round(2)
-
-
-# ============================================================
-# Performance by shipping mode
-# ============================================================
-
-def metrics_by_shipping_mode(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
-
-    return _group_metrics(
-        df,
-        "Shipping_Mode",
+    grouped["ROI_Percentage"] = (
+        grouped["Savings"]
+        / grouped["Expected_Cost"]
+        .replace(0, pd.NA)
+        * 100
     )
 
+    grouped["Success_Rate"] *= 100
+    grouped["On_Time_Rate"] *= 100
 
-# ============================================================
-# Performance by recommended action
-# ============================================================
+    return grouped.round(2)
+
 
 def metrics_by_action(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
 
-    return _group_metrics(
+    return grouped_metrics(
         df,
-        "recommended_action",
+        "Selected_Action",
     )
 
 
-# ============================================================
-# Performance by market
-# ============================================================
+def metrics_by_shipping_mode(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+
+    return grouped_metrics(
+        df,
+        "Shipping_Mode",
+    )
+
 
 def metrics_by_market(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
 
-    return _group_metrics(
+    return grouped_metrics(
         df,
         "Market",
     )
 
 
-# ============================================================
-# Performance by region
-# ============================================================
-
 def metrics_by_region(
     df: pd.DataFrame,
 ) -> pd.DataFrame:
 
-    return _group_metrics(
+    return grouped_metrics(
         df,
         "Order_Region",
     )
 
 
 # ============================================================
-# Test
+# MAIN
 # ============================================================
 
-if __name__ == "__main__":
+def main() -> None:
 
+    df = load_outcome_data()
+
+    metrics = calculate_metrics(df)
+
+    print("=" * 60)
+    print("SUPPLY PRESCRIPT - PERFORMANCE METRICS")
+    print("=" * 60)
+
+    for key, value in metrics.items():
+        print(
+            f"{key}: {value}"
+        )
+
+    print("\nMetrics by Action:")
     print(
-        "performance_metrics.py loaded successfully."
+        metrics_by_action(df).to_string(
+            index=False
+        )
     )
+
+    print("\nMetrics by Shipping Mode:")
+    print(
+        metrics_by_shipping_mode(df).to_string(
+            index=False
+        )
+    )
+
+    print("\nMetrics by Market:")
+    print(
+        metrics_by_market(df).to_string(
+            index=False
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
