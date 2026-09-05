@@ -104,7 +104,7 @@ def evaluate_model():
     print(f"ROC-AUC: {roc_auc_score(y_test, probabilities):.4f}")
 
     # Detailed analysis using 0.40 threshold
-    selected_threshold = 0.40
+    selected_threshold = 0.35
     predictions = (probabilities >= selected_threshold).astype(int)
 
     print("\n" + "=" * 70)
