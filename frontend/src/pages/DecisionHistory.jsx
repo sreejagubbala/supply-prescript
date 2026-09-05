@@ -1,1050 +1,1201 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
 
 // ============================================================
-// CSV PARSER
+// SUPPLY PRESCRIPT
+// Member 5 - Closed-Loop & Analytics
+// Decision History
 // ============================================================
 
-function parseCSV(text) {
-  const lines = text
-    .trim()
-    .split(/\r?\n/)
-    .filter((line) => line.trim() !== "");
+const API_URL = "http://127.0.0.1:8000/api/outcomes/";
 
-  if (lines.length < 2) {
-    return [];
+// ------------------------------------------------------------
+// Helper functions
+// ------------------------------------------------------------
+
+function firstValue(row, keys, fallback = "") {
+  for (const key of keys) {
+    if (
+      row &&
+      row[key] !== undefined &&
+      row[key] !== null &&
+      row[key] !== ""
+    ) {
+      return row[key];
+    }
   }
 
-  const headers = lines[0]
-    .split(",")
-    .map((header) => header.trim());
+  return fallback;
+}
 
-  return lines.slice(1).map((line) => {
-    const values = line.split(",");
-    const row = {};
+function toNumber(value, fallback = 0) {
+  const number = Number(value);
 
-    headers.forEach((header, index) => {
-      row[header] = values[index]
-        ? values[index].trim()
-        : "";
-    });
+  return Number.isFinite(number) ? number : fallback;
+}
 
-    return row;
+function toBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    return [
+      "true",
+      "1",
+      "yes",
+      "y",
+      "success",
+      "successful",
+      "on time",
+      "on_time",
+      "ontime",
+    ].includes(normalized);
+  }
+
+  return false;
+}
+
+function formatCurrency(value) {
+  return `₹${toNumber(value).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
-// ============================================================
-// GET VALUE
-// ============================================================
-
-function getValue(row, column) {
-  return row[column] !== undefined && row[column] !== ""
-    ? row[column]
-    : "-";
+function formatNumber(value) {
+  return toNumber(value).toLocaleString("en-IN");
 }
 
-// ============================================================
-// NUMBER
-// ============================================================
+// ------------------------------------------------------------
+// Normalize backend outcome data
+// ------------------------------------------------------------
 
-function getNumber(row, column) {
-  const value = getValue(row, column);
-
-  const number = Number(
-    String(value).replace(/[$₹,%]/g, "")
+function normalizeOutcome(row, index) {
+  const expectedDelivery = toNumber(
+    firstValue(row, [
+      "Expected_Delivery_Days",
+      "expected_delivery_days",
+      "ExpectedDeliveryDays",
+    ])
   );
 
-  return Number.isNaN(number) ? 0 : number;
+  const actualDelivery = toNumber(
+    firstValue(row, [
+      "Actual_Delivery_Days",
+      "actual_delivery_days",
+      "ActualDeliveryDays",
+    ])
+  );
+
+  const expectedCost = toNumber(
+    firstValue(row, [
+      "Expected_Cost",
+      "expected_cost",
+      "ExpectedCost",
+    ])
+  );
+
+  const actualCost = toNumber(
+    firstValue(row, [
+      "Actual_Cost",
+      "actual_cost",
+      "ActualCost",
+    ])
+  );
+
+  const costSaving = toNumber(
+    firstValue(row, [
+      "Cost_Saving",
+      "cost_saving",
+      "CostSaving",
+    ], expectedCost - actualCost)
+  );
+
+  const actionSuccess = toBoolean(
+    firstValue(row, [
+      "Action_Success",
+      "action_success",
+      "Outcome_Success",
+      "outcome_success",
+      "Success",
+      "success",
+    ])
+  );
+
+  const onTime = toBoolean(
+    firstValue(row, [
+      "On_Time",
+      "on_time",
+      "OnTime",
+      "Delivery_On_Time",
+    ])
+  );
+
+  const shipmentId = firstValue(
+    row,
+    ["Shipment_ID", "shipment_id"],
+    "-"
+  );
+
+  const decisionId = firstValue(
+    row,
+    ["Decision_ID", "decision_id"],
+    `DEC-${String(index + 1).padStart(4, "0")}`
+  );
+
+  return {
+    decisionId,
+
+    shipmentId,
+
+    decisionDate: firstValue(
+      row,
+      [
+        "Decision_Date",
+        "decision_date",
+        "Shipment_Date",
+        "shipment_date",
+      ]
+    ),
+
+    category: firstValue(
+      row,
+      ["Category_Name", "category_name", "Category"],
+      "-"
+    ),
+
+    market: firstValue(
+      row,
+      ["Market", "market"],
+      "-"
+    ),
+
+    region: firstValue(
+      row,
+      ["Order_Region", "order_region", "Region"],
+      "-"
+    ),
+
+    country: firstValue(
+      row,
+      ["Customer_Country", "customer_country", "Country"],
+      "-"
+    ),
+
+    city: firstValue(
+      row,
+      ["Customer_City", "customer_city", "City"],
+      "-"
+    ),
+
+    shippingMode: firstValue(
+      row,
+      ["Shipping_Mode", "shipping_mode"],
+      "-"
+    ),
+
+    quantity: toNumber(
+      firstValue(row, [
+        "Order_Item_Quantity",
+        "order_item_quantity",
+        "Quantity",
+        "quantity",
+      ])
+    ),
+
+    risk: firstValue(
+      row,
+      [
+        "Late_delivery_risk",
+        "late_delivery_risk",
+        "Risk",
+        "risk",
+      ],
+      "-"
+    ),
+
+    recommendedAction: firstValue(
+      row,
+      [
+        "Recommended_Action",
+        "recommended_action",
+        "RecommendedAction",
+      ],
+      "-"
+    ),
+
+    selectedAction: firstValue(
+      row,
+      [
+        "Selected_Action",
+        "selected_action",
+        "SelectedAction",
+      ],
+      "-"
+    ),
+
+    expectedDelivery,
+
+    actualDelivery,
+
+    deliveryDifference: actualDelivery - expectedDelivery,
+
+    expectedCost,
+
+    actualCost,
+
+    costSaving,
+
+    actionSuccess,
+
+    onTime,
+
+    raw: row,
+  };
 }
 
-// ============================================================
-// CURRENCY
-// ============================================================
+// ------------------------------------------------------------
+// Main component
+// ------------------------------------------------------------
 
-function currency(value) {
-  return `₹${Number(value).toLocaleString(
-    undefined,
-    {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }
-  )}`;
-}
+export default function DecisionHistory() {
+  const [records, setRecords] = useState([]);
 
-// ============================================================
-// DECISION HISTORY
-// ============================================================
-
-function DecisionHistory() {
-  const navigate = useNavigate();
-
-  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
 
-  // ==========================================================
-  // LOAD CSV
-  // ==========================================================
+  const [search, setSearch] = useState("");
+
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  // ----------------------------------------------------------
+  // Fetch outcome records
+  // ----------------------------------------------------------
+
+  const loadOutcomes = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(API_URL);
+
+      if (!response.ok) {
+        throw new Error(
+          `Backend returned HTTP ${response.status}`
+        );
+      }
+
+      const result = await response.json();
+
+      // Supports:
+      // 1. [ {...}, {...} ]
+      // 2. { data: [...] }
+      // 3. { outcomes: [...] }
+      // 4. { records: [...] }
+
+      let rows = [];
+
+      if (Array.isArray(result)) {
+        rows = result;
+      } else if (Array.isArray(result.data)) {
+        rows = result.data;
+      } else if (Array.isArray(result.outcomes)) {
+        rows = result.outcomes;
+      } else if (Array.isArray(result.records)) {
+        rows = result.records;
+      }
+
+      const normalizedRecords = rows.map((row, index) =>
+        normalizeOutcome(row, index)
+      );
+
+      setRecords(normalizedRecords);
+    } catch (err) {
+      console.error("Failed to load decision outcomes:", err);
+
+      setError(
+        "Unable to load decision outcome data. Make sure the Member 5 FastAPI backend is running on port 8000."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch("/data/decision_outcome.csv")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(
-            "decision_outcome.csv not found"
-          );
-        }
-
-        return response.text();
-      })
-      .then((text) => {
-        const parsedData = parseCSV(text);
-
-        setData(parsedData);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-
-        setError(
-          "Unable to load decision outcome data."
-        );
-
-        setLoading(false);
-      });
+    loadOutcomes();
   }, []);
 
-  // ==========================================================
-  // SUMMARY CALCULATIONS
-  // ==========================================================
+  // ----------------------------------------------------------
+  // Filter records
+  // ----------------------------------------------------------
 
-  const successful = data.filter(
-    (row) =>
-      String(row.outcome_status)
-        .toLowerCase()
-        .trim() === "successful"
+  const filteredRecords = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return records.filter((record) => {
+      const matchesSearch =
+        !query ||
+        record.decisionId.toLowerCase().includes(query) ||
+        String(record.shipmentId)
+          .toLowerCase()
+          .includes(query) ||
+        String(record.market)
+          .toLowerCase()
+          .includes(query) ||
+        String(record.recommendedAction)
+          .toLowerCase()
+          .includes(query) ||
+        String(record.selectedAction)
+          .toLowerCase()
+          .includes(query);
+
+      let matchesStatus = true;
+
+      if (filterStatus === "successful") {
+        matchesStatus = record.actionSuccess;
+      }
+
+      if (filterStatus === "delayed") {
+        matchesStatus = !record.onTime;
+      }
+
+      if (filterStatus === "on-time") {
+        matchesStatus = record.onTime;
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [records, search, filterStatus]);
+
+  // ----------------------------------------------------------
+  // KPI calculations
+  // ----------------------------------------------------------
+
+  const totalDecisions = records.length;
+
+  const successfulDecisions = records.filter(
+    (record) => record.actionSuccess
   ).length;
 
-  const unsuccessful = data.filter(
-    (row) =>
-      String(row.outcome_status)
-        .toLowerCase()
-        .trim() === "unsuccessful"
-  ).length;
-
-  const delayed = data.filter(
-    (row) =>
-      String(row.delivery_status)
-        .toLowerCase()
-        .trim() === "delayed"
-  ).length;
-
-  const onTime = data.filter(
-    (row) =>
-      String(row.delivery_status)
-        .toLowerCase()
-        .trim() === "on time"
+  const delayedShipments = records.filter(
+    (record) => !record.onTime
   ).length;
 
   const successRate =
-    data.length > 0
-      ? (successful / data.length) * 100
+    totalDecisions > 0
+      ? (successfulDecisions / totalDecisions) * 100
       : 0;
 
   const onTimeRate =
-    data.length > 0
-      ? (onTime / data.length) * 100
+    totalDecisions > 0
+      ? (records.filter((record) => record.onTime).length /
+          totalDecisions) *
+        100
       : 0;
 
-  // ==========================================================
-  // LOADING
-  // ==========================================================
+  const totalSavings = records.reduce(
+    (sum, record) => sum + record.costSaving,
+    0
+  );
 
-  if (loading) {
-    return (
-      <div className="history-page">
-        <div className="loading-box">
-          <h2>Loading Decision History...</h2>
-          <p>
-            Reading decision outcome data
-          </p>
-        </div>
+  // ----------------------------------------------------------
+  // Status badge
+  // ----------------------------------------------------------
 
-        <style>{`
+  const getStatus = (record) => {
+    if (record.actionSuccess && record.onTime) {
+      return {
+        text: "Successful",
+        className: "status-success",
+      };
+    }
 
-          .history-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f7f8fa;
-            font-family: Arial, Helvetica, sans-serif;
-          }
+    if (!record.onTime) {
+      return {
+        text: "Delayed",
+        className: "status-danger",
+      };
+    }
 
-          .loading-box {
-            background: white;
-            padding: 35px;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            text-align: center;
-          }
+    if (record.actionSuccess) {
+      return {
+        text: "Successful",
+        className: "status-success",
+      };
+    }
 
-        `}</style>
-      </div>
-    );
-  }
+    return {
+      text: "Unsuccessful",
+      className: "status-warning",
+    };
+  };
 
-  // ==========================================================
-  // ERROR
-  // ==========================================================
+  // ----------------------------------------------------------
+  // Risk badge
+  // ----------------------------------------------------------
 
-  if (error) {
-    return (
-      <div className="history-page">
-        <div className="error-box">
-          <h2>Data Loading Error</h2>
+  const getRiskClass = (risk) => {
+    const value = String(risk).toLowerCase();
 
-          <p>{error}</p>
+    if (value.includes("high")) {
+      return "risk-high";
+    }
 
-          <button
-            className="back-button"
-            onClick={() => navigate("/")}
-          >
-            ← Back to Home
-          </button>
-        </div>
+    if (value.includes("medium")) {
+      return "risk-medium";
+    }
 
-        <style>{`
+    return "risk-low";
+  };
 
-          .history-page {
-            min-height: 100vh;
-            padding: 30px;
-            background: #f7f8fa;
-            font-family: Arial, Helvetica, sans-serif;
-          }
-
-          .error-box {
-            max-width: 600px;
-            margin: 100px auto;
-            padding: 30px;
-            background: #fee2e2;
-            color: #991b1b;
-            border-radius: 12px;
-            text-align: center;
-          }
-
-          .back-button {
-            margin-top: 20px;
-            padding: 11px 18px;
-            border: none;
-            border-radius: 8px;
-            background: #111827;
-            color: white;
-            cursor: pointer;
-          }
-
-        `}</style>
-      </div>
-    );
-  }
-
-  // ==========================================================
-  // PAGE
-  // ==========================================================
+  // ----------------------------------------------------------
+  // Render
+  // ----------------------------------------------------------
 
   return (
-    <div className="history-page">
-
-    <style>{`
-
-      * {
-        box-sizing: border-box;
-      }
-
-      /* ==========================================================
-        MAIN PAGE
-        ========================================================== */
-
-      .history-page {
-        min-height: 100vh;
-        padding: 20px;
-        background: #000000;
-        color: #ffffff;
-        font-family: Arial, Helvetica, sans-serif;
-      }
-
-
-      /* ==========================================================
-        HEADER
-        ========================================================== */
-
-      .history-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 18px;
-      }
-
-      .history-header h1 {
-        margin: 0 0 5px;
-        font-size: 26px;
-        color: #ffffff;
-      }
-
-      .history-header p {
-        margin: 0;
-        color: #9ca3af;
-        font-size: 13px;
-      }
-
-      .back-home-button {
-        border: 1px solid #374151;
-        border-radius: 7px;
-        padding: 9px 15px;
-        background: #111827;
-        color: #ffffff;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-
-      .back-home-button:hover {
-        background: #1f2937;
-      }
-
-
-      /* ==========================================================
-        SUMMARY CARDS
-        ========================================================== */
-
-      .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin-bottom: 18px;
-      }
-
-      .summary-card {
-        background: #111111;
-        border: 1px solid #2a2a2a;
-        border-radius: 9px;
-        padding: 14px 16px;
-      }
-
-      .summary-card span {
-        display: block;
-        color: #9ca3af;
-        font-size: 12px;
-        margin-bottom: 6px;
-      }
-
-      .summary-card strong {
-        font-size: 21px;
-        color: #ffffff;
-      }
-
-
-      /* ==========================================================
-        TABLE CARD
-        ========================================================== */
-
-      .table-card {
-        background: #0b0b0b;
-        border: 1px solid #292929;
-        border-radius: 10px;
-        padding: 15px;
-        overflow: hidden;
-      }
-
-      .table-header {
-        margin-bottom: 12px;
-      }
-
-      .table-header h2 {
-        margin: 0 0 4px;
-        font-size: 17px;
-        color: #ffffff;
-      }
-
-      .table-header p {
-        margin: 0;
-        color: #8f96a3;
-        font-size: 12px;
-      }
-
-
-      /* ==========================================================
-        HORIZONTAL SCROLL
-        ========================================================== */
-
-      .table-wrapper {
-        width: 100%;
-        overflow-x: auto;
-        overflow-y: hidden;
-        border: 1px solid #242424;
-        border-radius: 7px;
-      }
-
-      /*
-        Compact table.
-        User can scroll horizontally to see all columns.
-      */
-
-      .decision-table {
-        width: max-content;
-        min-width: 100%;
-        border-collapse: collapse;
-        background: #050505;
-      }
-
-
-      /* ==========================================================
-        TABLE HEADER
-        ========================================================== */
-
-      .decision-table th {
-        padding: 9px 10px;
-        background: #151515;
-        border-bottom: 1px solid #333333;
-        text-align: left;
-        font-size: 10px;
-        font-weight: 600;
-        color: #b8b8b8;
-        white-space: nowrap;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-      }
-
-
-      /* ==========================================================
-        TABLE DATA
-        ========================================================== */
-
-      .decision-table td {
-        padding: 9px 10px;
-        border-bottom: 1px solid #202020;
-        font-size: 11px;
-        color: #e5e7eb;
-        white-space: nowrap;
-      }
-
-      .decision-table tbody tr:hover {
-        background: #151515;
-      }
-
-
-      /* ==========================================================
-        DIFFERENCES
-        ========================================================== */
-
-      .positive {
-        color: #ef4444 !important;
-        font-weight: 600;
-      }
-
-      .negative {
-        color: #22c55e !important;
-        font-weight: 600;
-      }
-
-      .zero {
-        color: #9ca3af !important;
-        font-weight: 600;
-      }
-
-
-      /* ==========================================================
-        STATUS
-        ========================================================== */
-
-      .status {
-        display: inline-block;
-        padding: 4px 7px;
-        border-radius: 12px;
-        font-size: 10px;
-        font-weight: 600;
-      }
-
-      .status-success {
-        background: #12351f;
-        color: #4ade80;
-      }
-
-      .status-failed {
-        background: #3b1515;
-        color: #f87171;
-      }
-
-      .status-delayed {
-        background: #3b1515;
-        color: #f87171;
-      }
-
-      .status-on-time {
-        background: #12351f;
-        color: #4ade80;
-      }
-
-
-      /* ==========================================================
-        RISK
-        ========================================================== */
-
-      .risk-high {
-        background: #3b1515;
-        color: #f87171;
-        padding: 4px 7px;
-        border-radius: 12px;
-        font-size: 10px;
-        font-weight: 600;
-      }
-
-      .risk-low {
-        background: #12351f;
-        color: #4ade80;
-        padding: 4px 7px;
-        border-radius: 12px;
-        font-size: 10px;
-        font-weight: 600;
-      }
-
-
-      /* ==========================================================
-        SCROLLBAR
-        ========================================================== */
-
-      .table-wrapper::-webkit-scrollbar {
-        height: 8px;
-      }
-
-      .table-wrapper::-webkit-scrollbar-track {
-        background: #111111;
-      }
-
-      .table-wrapper::-webkit-scrollbar-thumb {
-        background: #444444;
-        border-radius: 10px;
-      }
-
-      .table-wrapper::-webkit-scrollbar-thumb:hover {
-        background: #666666;
-      }
-
-
-      /* ==========================================================
-        EMPTY
-        ========================================================== */
-
-      .empty {
-        text-align: center;
-        padding: 40px;
-        color: #9ca3af;
-      }
-
-
-      /* ==========================================================
-        RESPONSIVE
-        ========================================================== */
-
-      @media (max-width: 900px) {
-
-        .summary-grid {
-          grid-template-columns: repeat(2, 1fr);
+    <>
+      <style>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        .decision-history {
+          min-height: 100vh;
+          background: #000;
+          color: #f5f5f5;
+          padding: 28px 22px 50px;
+          font-family: Arial, Helvetica, sans-serif;
         }
 
         .history-header {
-          flex-direction: column;
-          align-items: flex-start;
+          margin-bottom: 24px;
         }
 
-      }
-
-      @media (max-width: 600px) {
-
-        .history-page {
-          padding: 12px;
+        .history-header h1 {
+          margin: 0;
+          font-size: 30px;
+          font-weight: 500;
         }
 
-        .summary-grid {
-          grid-template-columns: 1fr 1fr;
+        .history-header p {
+          margin: 8px 0 0;
+          color: #9bb6d2;
+          font-size: 15px;
         }
 
-      }
+        .connection-status {
+          margin-top: 14px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: #7fb3df;
+        }
 
-    `}</style>
-      {/* ================================================== */}
-      {/* HEADER */}
-      {/* ================================================== */}
+        .connection-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #4ade80;
+        }
 
-      <div className="history-header">
+        .connection-dot.error {
+          background: #ef4444;
+        }
 
-        <div>
+        .kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(160px, 1fr));
+          gap: 14px;
+          margin-bottom: 22px;
+        }
 
-          <h1>
-            Decision History
-          </h1>
+        .kpi-card {
+          background: #111;
+          border: 1px solid #292929;
+          border-radius: 10px;
+          padding: 18px;
+          min-height: 100px;
+        }
+
+        .kpi-title {
+          color: #8eb1d5;
+          font-size: 13px;
+          margin-bottom: 12px;
+        }
+
+        .kpi-value {
+          font-size: 25px;
+          font-weight: 700;
+          color: #fff;
+        }
+
+        .toolbar {
+          background: #0d0d0d;
+          border: 1px solid #292929;
+          border-radius: 10px;
+          padding: 15px;
+          margin-bottom: 14px;
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .search-input {
+          flex: 1;
+          min-width: 240px;
+          background: #050505;
+          color: #fff;
+          border: 1px solid #343434;
+          border-radius: 7px;
+          padding: 11px 13px;
+          outline: none;
+        }
+
+        .search-input:focus {
+          border-color: #9b18ff;
+        }
+
+        .filter-select {
+          background: #050505;
+          color: #fff;
+          border: 1px solid #343434;
+          border-radius: 7px;
+          padding: 11px 13px;
+          min-width: 150px;
+          outline: none;
+        }
+
+        .refresh-button {
+          background: #9417f4;
+          color: white;
+          border: none;
+          border-radius: 7px;
+          padding: 11px 18px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .refresh-button:hover {
+          background: #a82aff;
+        }
+
+        .records-card {
+          background: #080808;
+          border: 1px solid #292929;
+          border-radius: 10px;
+          overflow: hidden;
+        }
+
+        .records-header {
+          padding: 20px 18px;
+          border-bottom: 1px solid #292929;
+        }
+
+        .records-header h2 {
+          margin: 0;
+          font-size: 19px;
+          font-weight: 500;
+        }
+
+        .records-header p {
+          margin: 7px 0 0;
+          color: #7e9bb8;
+          font-size: 13px;
+        }
+
+        .table-wrapper {
+          overflow-x: auto;
+          width: 100%;
+        }
+
+        table {
+          width: 100%;
+          min-width: 2100px;
+          border-collapse: collapse;
+        }
+
+        th {
+          background: #111;
+          color: #a9c2db;
+          font-size: 12px;
+          font-weight: 600;
+          text-align: left;
+          padding: 13px 10px;
+          border-bottom: 1px solid #303030;
+          white-space: nowrap;
+        }
+
+        td {
+          padding: 13px 10px;
+          border-bottom: 1px solid #1d1d1d;
+          font-size: 12px;
+          white-space: nowrap;
+          color: #e8e8e8;
+        }
+
+        tr:hover td {
+          background: #101010;
+        }
+
+        .decision-id {
+          color: #c46bff;
+          font-weight: 600;
+        }
+
+        .shipment-id {
+          color: #8ec5ff;
+        }
+
+        .risk-badge,
+        .status-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 20px;
+          padding: 4px 9px;
+          font-size: 11px;
+          font-weight: 600;
+        }
+
+        .risk-low {
+          color: #6ee7a0;
+          background: #123b25;
+        }
+
+        .risk-medium {
+          color: #facc15;
+          background: #40370d;
+        }
+
+        .risk-high {
+          color: #ff8d8d;
+          background: #451616;
+        }
+
+        .status-success {
+          color: #6ee7a0;
+          background: #123b25;
+        }
+
+        .status-danger {
+          color: #ff8d8d;
+          background: #451616;
+        }
+
+        .status-warning {
+          color: #facc15;
+          background: #40370d;
+        }
+
+        .positive {
+          color: #6ee7a0;
+        }
+
+        .negative {
+          color: #ff8d8d;
+        }
+
+        .loading-box,
+        .error-box,
+        .empty-box {
+          padding: 50px 20px;
+          text-align: center;
+          color: #8fa6bd;
+        }
+
+        .error-box {
+          color: #ff8d8d;
+        }
+
+        .retry-button {
+          margin-top: 15px;
+          background: #9417f4;
+          color: white;
+          border: none;
+          padding: 10px 18px;
+          border-radius: 7px;
+          cursor: pointer;
+        }
+
+        .table-footer {
+          padding: 13px 18px;
+          color: #7790a9;
+          font-size: 12px;
+          border-top: 1px solid #222;
+        }
+
+        @media (max-width: 1100px) {
+          .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .decision-history {
+            padding: 18px 12px;
+          }
+
+          .kpi-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .history-header h1 {
+            font-size: 25px;
+          }
+        }
+      `}</style>
+
+      <div className="decision-history">
+
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
+
+        <div className="history-header">
+          <h1>Decision History</h1>
 
           <p>
             Track decisions, expected results and actual outcomes
           </p>
 
+          <div className="connection-status">
+            <span
+              className={`connection-dot ${
+                error ? "error" : ""
+              }`}
+            />
+
+            {error
+              ? "Backend connection unavailable"
+              : loading
+              ? "Loading outcome data..."
+              : "Connected to Closed-Loop Analytics API"}
+          </div>
         </div>
 
-        <button
-          className="back-home-button"
-          onClick={() => navigate("/")}
-        >
-          ← Back to Home
-        </button>
+        {/* =====================================================
+            KPI CARDS
+        ===================================================== */}
 
-      </div>
+        <div className="kpi-grid">
 
-      {/* ================================================== */}
-      {/* SUMMARY */}
-      {/* ================================================== */}
+          <div className="kpi-card">
+            <div className="kpi-title">
+              Total Decisions
+            </div>
 
-      <div className="summary-grid">
-
-        <div className="summary-card">
-
-          <span>
-            Total Decisions
-          </span>
-
-          <strong>
-            {data.length}
-          </strong>
-
-        </div>
-
-        <div className="summary-card">
-
-          <span>
-            Successful
-          </span>
-
-          <strong>
-            {successful}
-          </strong>
-
-        </div>
-
-        <div className="summary-card">
-
-          <span>
-            Delayed Shipments
-          </span>
-
-          <strong>
-            {delayed}
-          </strong>
-
-        </div>
-
-        <div className="summary-card">
-
-          <span>
-            Success Rate
-          </span>
-
-          <strong>
-            {successRate.toFixed(1)}%
-          </strong>
-
-        </div>
-
-      </div>
-
-      {/* ================================================== */}
-      {/* TABLE */}
-      {/* ================================================== */}
-
-      <div className="table-card">
-
-        <div className="table-header">
-
-          <h2>
-            Decision / Outcome Records
-          </h2>
-
-          <p>
-            Predicted vs actual performance from the closed-loop process
-          </p>
-
-        </div>
-
-        {data.length === 0 ? (
-
-          <div className="empty">
-            No decision records found.
+            <div className="kpi-value">
+              {formatNumber(totalDecisions)}
+            </div>
           </div>
 
-        ) : (
-
-          <div className="table-wrapper">
-
-            <table className="decision-table">
-
-              <thead>
-
-                <tr>
-
-                  <th>Decision ID</th>
-
-                  <th>Shipment ID</th>
-
-                  <th>Date</th>
-
-                  <th>Category</th>
-
-                  <th>Market</th>
-
-                  <th>Region</th>
-
-                  <th>Country</th>
-
-                  <th>City</th>
-
-                  <th>Shipping Mode</th>
-
-                  <th>Quantity</th>
-
-                  <th>Risk</th>
-
-                  <th>Recommended Action</th>
-
-                  <th>Expected Delivery</th>
-
-                  <th>Actual Delivery</th>
-
-                  <th>Delivery Difference</th>
-
-                  <th>Expected Cost</th>
-
-                  <th>Actual Cost</th>
-
-                  <th>Cost Difference</th>
-
-                  <th>Delivery Status</th>
-
-                  <th>Outcome</th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {data.map((row, index) => {
-
-                  const expectedDelivery =
-                    getNumber(
-                      row,
-                      "expected_delivery_days"
-                    );
-
-                  const actualDelivery =
-                    getNumber(
-                      row,
-                      "actual_delivery_days"
-                    );
-
-                  const expectedCost =
-                    getNumber(
-                      row,
-                      "expected_cost"
-                    );
-
-                  const actualCost =
-                    getNumber(
-                      row,
-                      "actual_cost"
-                    );
-
-                  /*
-                   * Positive delivery difference means
-                   * actual delivery took more days.
-                   */
-
-                  const deliveryDifference =
-                    actualDelivery -
-                    expectedDelivery;
-
-                  /*
-                   * Positive cost difference means
-                   * actual cost was higher.
-                   */
-
-                  const costDifference =
-                    actualCost -
-                    expectedCost;
-
-                  const risk =
-                    getNumber(
-                      row,
-                      "Late_delivery_risk"
-                    );
-
-                  const outcome =
-                    getValue(
-                      row,
-                      "outcome_status"
-                    );
-
-                  const deliveryStatus =
-                    getValue(
-                      row,
-                      "delivery_status"
-                    );
-
-                  const outcomeClass =
-                    outcome.toLowerCase() ===
-                    "successful"
-                      ? "status-success"
-                      : "status-failed";
-
-                  const deliveryClass =
-                    deliveryStatus
-                      .toLowerCase()
-                      .includes("delayed")
-                      ? "status-delayed"
-                      : "status-on-time";
-
-                  return (
-
-                    <tr key={index}>
-
-                      {/* Decision ID */}
-
-                      <td>
-                        DEC-
-                        {String(index + 1)
-                          .padStart(4, "0")}
-                      </td>
-
-                      {/* Shipment ID */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Shipment_ID"
-                        )}
-                      </td>
-
-                      {/* Date */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Shipment_Date"
-                        )}
-                      </td>
-
-                      {/* Category */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Category_Name"
-                        )}
-                      </td>
-
-                      {/* Market */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Market"
-                        )}
-                      </td>
-
-                      {/* Region */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Order_Region"
-                        )}
-                      </td>
-
-                      {/* Country */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Customer_Country"
-                        )}
-                      </td>
-
-                      {/* City */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Customer_City"
-                        )}
-                      </td>
-
-                      {/* Shipping Mode */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Shipping_Mode"
-                        )}
-                      </td>
-
-                      {/* Quantity */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "Order_Item_Quantity"
-                        )}
-                      </td>
-
-                      {/* Risk */}
-
-                      <td>
-
-                        {risk === 1 ? (
-
-                          <span className="risk-high">
-                            High
-                          </span>
-
-                        ) : (
-
-                          <span className="risk-low">
-                            Low
-                          </span>
-
-                        )}
-
-                      </td>
-
-                      {/* Recommended Action */}
-
-                      <td>
-                        {getValue(
-                          row,
-                          "recommended_action"
-                        )}
-                      </td>
-
-                      {/* Expected Delivery */}
-
-                      <td>
-                        {expectedDelivery} days
-                      </td>
-
-                      {/* Actual Delivery */}
-
-                      <td>
-                        {actualDelivery} days
-                      </td>
-
-                      {/* Delivery Difference */}
-
-                      <td
-                        className={
-                          deliveryDifference > 0
-                            ? "positive"
-                            : deliveryDifference < 0
-                            ? "negative"
-                            : "zero"
-                        }
-                      >
-
-                        {deliveryDifference > 0
-                          ? `+${deliveryDifference}`
-                          : deliveryDifference}{" "}
-                        days
-
-                      </td>
-
-                      {/* Expected Cost */}
-
-                      <td>
-                        {currency(
-                          expectedCost
-                        )}
-                      </td>
-
-                      {/* Actual Cost */}
-
-                      <td>
-                        {currency(
-                          actualCost
-                        )}
-                      </td>
-
-                      {/* Cost Difference */}
-
-                      <td
-                        className={
-                          costDifference > 0
-                            ? "positive"
-                            : costDifference < 0
-                            ? "negative"
-                            : "zero"
-                        }
-                      >
-
-                        {costDifference > 0
-                          ? "+"
-                          : ""}
-
-                        {currency(
-                          costDifference
-                        )}
-
-                      </td>
-
-                      {/* Delivery Status */}
-
-                      <td>
-
-                        <span
-                          className={`status ${deliveryClass}`}
-                        >
-                          {deliveryStatus}
-                        </span>
-
-                      </td>
-
-                      {/* Outcome */}
-
-                      <td>
-
-                        <span
-                          className={`status ${outcomeClass}`}
-                        >
-                          {outcome}
-                        </span>
-
-                      </td>
+          <div className="kpi-card">
+            <div className="kpi-title">
+              Successful
+            </div>
+
+            <div className="kpi-value">
+              {formatNumber(successfulDecisions)}
+            </div>
+          </div>
+
+          <div className="kpi-card">
+            <div className="kpi-title">
+              Delayed Shipments
+            </div>
+
+            <div className="kpi-value">
+              {formatNumber(delayedShipments)}
+            </div>
+          </div>
+
+          <div className="kpi-card">
+            <div className="kpi-title">
+              Success Rate
+            </div>
+
+            <div className="kpi-value">
+              {successRate.toFixed(1)}%
+            </div>
+          </div>
+
+          <div className="kpi-card">
+            <div className="kpi-title">
+              Total Cost Saving
+            </div>
+
+            <div className="kpi-value">
+              {formatCurrency(totalSavings)}
+            </div>
+          </div>
+
+        </div>
+
+        {/* =====================================================
+            SEARCH / FILTER
+        ===================================================== */}
+
+        <div className="toolbar">
+
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search Decision ID, Shipment ID, Market or Action..."
+            value={search}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
+          />
+
+          <select
+            className="filter-select"
+            value={filterStatus}
+            onChange={(event) =>
+              setFilterStatus(event.target.value)
+            }
+          >
+            <option value="all">
+              All Decisions
+            </option>
+
+            <option value="successful">
+              Successful
+            </option>
+
+            <option value="delayed">
+              Delayed
+            </option>
+
+            <option value="on-time">
+              On Time
+            </option>
+          </select>
+
+          <button
+            className="refresh-button"
+            onClick={loadOutcomes}
+          >
+            Refresh
+          </button>
+
+        </div>
+
+        {/* =====================================================
+            RECORDS TABLE
+        ===================================================== */}
+
+        <div className="records-card">
+
+          <div className="records-header">
+            <h2>
+              Decision / Outcome Records
+            </h2>
+
+            <p>
+              Predicted vs actual performance from the
+              closed-loop process
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="loading-box">
+              Loading decision outcome records...
+            </div>
+          ) : error ? (
+            <div className="error-box">
+              {error}
+
+              <br />
+
+              <button
+                className="retry-button"
+                onClick={loadOutcomes}
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="empty-box">
+              No decision outcome records found.
+            </div>
+          ) : (
+            <>
+              <div className="table-wrapper">
+
+                <table>
+
+                  <thead>
+                    <tr>
+
+                      <th>
+                        Decision ID
+                      </th>
+
+                      <th>
+                        Shipment ID
+                      </th>
+
+                      <th>
+                        Date
+                      </th>
+
+                      <th>
+                        Category
+                      </th>
+
+                      <th>
+                        Market
+                      </th>
+
+                      <th>
+                        Region
+                      </th>
+
+                      <th>
+                        Country
+                      </th>
+
+                      <th>
+                        City
+                      </th>
+
+                      <th>
+                        Shipping Mode
+                      </th>
+
+                      <th>
+                        Quantity
+                      </th>
+
+                      <th>
+                        Risk
+                      </th>
+
+                      <th>
+                        Recommended Action
+                      </th>
+
+                      <th>
+                        Selected Action
+                      </th>
+
+                      <th>
+                        Expected Delivery
+                      </th>
+
+                      <th>
+                        Actual Delivery
+                      </th>
+
+                      <th>
+                        Delivery Difference
+                      </th>
+
+                      <th>
+                        Expected Cost
+                      </th>
+
+                      <th>
+                        Actual Cost
+                      </th>
+
+                      <th>
+                        Cost Saving
+                      </th>
+
+                      <th>
+                        Status
+                      </th>
 
                     </tr>
+                  </thead>
 
-                  );
+                  <tbody>
 
-                })}
+                    {filteredRecords.map((record) => {
 
-              </tbody>
+                      const status = getStatus(record);
 
-            </table>
+                      const difference =
+                        record.deliveryDifference;
 
-          </div>
+                      return (
+                        <tr key={record.decisionId}>
 
-        )}
+                          <td>
+                            <span className="decision-id">
+                              {record.decisionId}
+                            </span>
+                          </td>
+
+                          <td>
+                            <span className="shipment-id">
+                              {record.shipmentId}
+                            </span>
+                          </td>
+
+                          <td>
+                            {formatDate(
+                              record.decisionDate
+                            )}
+                          </td>
+
+                          <td>
+                            {record.category}
+                          </td>
+
+                          <td>
+                            {record.market}
+                          </td>
+
+                          <td>
+                            {record.region}
+                          </td>
+
+                          <td>
+                            {record.country}
+                          </td>
+
+                          <td>
+                            {record.city}
+                          </td>
+
+                          <td>
+                            {record.shippingMode}
+                          </td>
+
+                          <td>
+                            {formatNumber(
+                              record.quantity
+                            )}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`risk-badge ${getRiskClass(
+                                record.risk
+                              )}`}
+                            >
+                              {record.risk}
+                            </span>
+                          </td>
+
+                          <td>
+                            {record.recommendedAction}
+                          </td>
+
+                          <td>
+                            {record.selectedAction}
+                          </td>
+
+                          <td>
+                            {record.expectedDelivery} days
+                          </td>
+
+                          <td>
+                            {record.actualDelivery} days
+                          </td>
+
+                          <td>
+                            <span
+                              className={
+                                difference > 0
+                                  ? "negative"
+                                  : difference < 0
+                                  ? "positive"
+                                  : ""
+                              }
+                            >
+                              {difference > 0
+                                ? "+"
+                                : ""}
+                              {difference} days
+                            </span>
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              record.expectedCost
+                            )}
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              record.actualCost
+                            )}
+                          </td>
+
+                          <td>
+                            <span
+                              className={
+                                record.costSaving >= 0
+                                  ? "positive"
+                                  : "negative"
+                              }
+                            >
+                              {formatCurrency(
+                                record.costSaving
+                              )}
+                            </span>
+                          </td>
+
+                          <td>
+                            <span
+                              className={`status-badge ${status.className}`}
+                            >
+                              {status.text}
+                            </span>
+                          </td>
+
+                        </tr>
+                      );
+                    })}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+              <div className="table-footer">
+                Showing {filteredRecords.length} of{" "}
+                {records.length} decision outcome records
+                &nbsp; | &nbsp;
+                On-Time Rate: {onTimeRate.toFixed(1)}%
+              </div>
+            </>
+          )}
+
+        </div>
 
       </div>
-
-    </div>
+    </>
   );
 }
-
-export default DecisionHistory;
