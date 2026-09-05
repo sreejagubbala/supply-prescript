@@ -6,7 +6,6 @@ const navItems = [
   { name: 'Suppliers', path: '/suppliers' },
   { name: 'ROI / Analytics', path: '/decision-roi' },
   { name: 'History', path: '/decision-history'},
-  { name: 'Feedback', path: '/feedback'}
 ]
 
 function Sidebar() {
