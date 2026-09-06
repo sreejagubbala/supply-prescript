@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-
 // ============================================================
 // CSV PARSER
 // ============================================================
 
 function parseCSV(text) {
-
   const lines = text
     .trim()
     .split(/\r?\n/)
@@ -22,153 +20,90 @@ function parseCSV(text) {
     .map((header) => header.trim());
 
   return lines.slice(1).map((line) => {
-
     const values = line.split(",");
-
     const row = {};
 
     headers.forEach((header, index) => {
-
-      row[header] =
-        values[index]
-          ? values[index].trim()
-          : "";
-
+      row[header] = values[index]
+        ? values[index].trim()
+        : "";
     });
 
     return row;
-
   });
 }
-
-
-// ============================================================
-// FIND COLUMN
-// ============================================================
-
-function findColumn(row, names) {
-
-  const keys = Object.keys(row);
-
-  for (const name of names) {
-
-    const found = keys.find(
-      (key) =>
-        key
-          .toLowerCase()
-          .replace(/[\s_-]/g, "") ===
-        name
-          .toLowerCase()
-          .replace(/[\s_-]/g, "")
-    );
-
-    if (found) {
-      return found;
-    }
-
-  }
-
-  return null;
-}
-
 
 // ============================================================
 // GET VALUE
 // ============================================================
 
-function getValue(row, names) {
-
-  const column = findColumn(row, names);
-
-  if (!column) {
-    return "-";
-  }
-
-  return row[column] || "-";
+function getValue(row, column) {
+  return row[column] !== undefined && row[column] !== ""
+    ? row[column]
+    : "-";
 }
-
 
 // ============================================================
 // NUMBER
 // ============================================================
 
-function getNumber(row, names) {
-
-  const value = getValue(row, names);
+function getNumber(row, column) {
+  const value = getValue(row, column);
 
   const number = Number(
     String(value).replace(/[$₹,%]/g, "")
   );
 
-  return Number.isNaN(number)
-    ? 0
-    : number;
+  return Number.isNaN(number) ? 0 : number;
 }
-
 
 // ============================================================
 // CURRENCY
 // ============================================================
 
 function currency(value) {
-
   return `₹${Number(value).toLocaleString(
     undefined,
     {
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }
   )}`;
-
 }
-
 
 // ============================================================
 // DECISION HISTORY
 // ============================================================
 
 function DecisionHistory() {
-
   const navigate = useNavigate();
 
   const [data, setData] = useState([]);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
-
 
   // ==========================================================
   // LOAD CSV
   // ==========================================================
 
   useEffect(() => {
-
     fetch("/data/decision_outcome.csv")
-
       .then((response) => {
-
         if (!response.ok) {
-
           throw new Error(
             "decision_outcome.csv not found"
           );
-
         }
 
         return response.text();
-
       })
-
       .then((text) => {
+        const parsedData = parseCSV(text);
 
-        setData(parseCSV(text));
-
+        setData(parsedData);
         setLoading(false);
-
       })
-
       .catch((err) => {
-
         console.error(err);
 
         setError(
@@ -176,85 +111,64 @@ function DecisionHistory() {
         );
 
         setLoading(false);
-
       });
-
   }, []);
 
-
   // ==========================================================
-  // CALCULATE SUMMARY
+  // SUMMARY CALCULATIONS
   // ==========================================================
 
-  const successful = data.filter((row) => {
+  const successful = data.filter(
+    (row) =>
+      String(row.outcome_status)
+        .toLowerCase()
+        .trim() === "successful"
+  ).length;
 
-    const value = getValue(
-      row,
-      [
-        "Decision_Success",
-        "decision_success",
-        "Decision Success",
-      ]
-    );
+  const unsuccessful = data.filter(
+    (row) =>
+      String(row.outcome_status)
+        .toLowerCase()
+        .trim() === "unsuccessful"
+  ).length;
 
-    return String(value)
-      .toLowerCase()
-      .trim() === "successful";
+  const delayed = data.filter(
+    (row) =>
+      String(row.delivery_status)
+        .toLowerCase()
+        .trim() === "delayed"
+  ).length;
 
-  }).length;
-
-
-  const partial = data.filter((row) => {
-
-    const value = getValue(
-      row,
-      [
-        "Decision_Success",
-        "decision_success",
-        "Decision Success",
-      ]
-    );
-
-    return String(value)
-      .toLowerCase()
-      .includes("partial");
-
-  }).length;
-
-
-  const unsuccessful = data.filter((row) => {
-
-    const value = getValue(
-      row,
-      [
-        "Decision_Success",
-        "decision_success",
-        "Decision Success",
-      ]
-    );
-
-    return String(value)
-      .toLowerCase()
-      .includes("unsuccessful");
-
-  }).length;
-
+  const onTime = data.filter(
+    (row) =>
+      String(row.delivery_status)
+        .toLowerCase()
+        .trim() === "on time"
+  ).length;
 
   const successRate =
     data.length > 0
       ? (successful / data.length) * 100
       : 0;
 
+  const onTimeRate =
+    data.length > 0
+      ? (onTime / data.length) * 100
+      : 0;
 
   // ==========================================================
   // LOADING
   // ==========================================================
 
   if (loading) {
-
     return (
-
       <div className="history-page">
+        <div className="loading-box">
+          <h2>Loading Decision History...</h2>
+          <p>
+            Reading decision outcome data
+          </p>
+        </div>
 
         <style>{`
 
@@ -276,35 +190,29 @@ function DecisionHistory() {
           }
 
         `}</style>
-
-        <div className="loading-box">
-
-          <h2>
-            Loading Decision History...
-          </h2>
-
-          <p>
-            Reading decision outcome data
-          </p>
-
-        </div>
-
       </div>
-
     );
-
   }
-
 
   // ==========================================================
   // ERROR
   // ==========================================================
 
   if (error) {
-
     return (
-
       <div className="history-page">
+        <div className="error-box">
+          <h2>Data Loading Error</h2>
+
+          <p>{error}</p>
+
+          <button
+            className="back-button"
+            onClick={() => navigate("/")}
+          >
+            ← Back to Home
+          </button>
+        </div>
 
         <style>{`
 
@@ -336,269 +244,336 @@ function DecisionHistory() {
           }
 
         `}</style>
-
-        <div className="error-box">
-
-          <h2>
-            Data Loading Error
-          </h2>
-
-          <p>
-            {error}
-          </p>
-
-          <button
-            className="back-button"
-            onClick={() => navigate("/")}
-          >
-            ← Back to Home
-          </button>
-
-        </div>
-
       </div>
-
     );
-
   }
-
 
   // ==========================================================
   // PAGE
   // ==========================================================
 
   return (
-
     <div className="history-page">
 
-      {/* ================================================== */}
-      {/* INLINE CSS */}
-      {/* ================================================== */}
+    <style>{`
 
-      <style>{`
+      * {
+        box-sizing: border-box;
+      }
 
-        * {
-          box-sizing: border-box;
-        }
+      /* ==========================================================
+        MAIN PAGE
+        ========================================================== */
 
-        .history-page {
-          min-height: 100vh;
-          padding: 28px;
-          background: #f7f8fa;
-          color: #111827;
-          font-family: Arial, Helvetica, sans-serif;
-        }
-
-
-        /* HEADER */
-
-        .history-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
-          margin-bottom: 25px;
-        }
-
-        .history-header h1 {
-          margin: 0 0 7px;
-          font-size: 30px;
-        }
-
-        .history-header p {
-          margin: 0;
-          color: #6b7280;
-          font-size: 14px;
-        }
-
-        .back-home-button {
-          border: none;
-          border-radius: 8px;
-          padding: 11px 18px;
-          background: #111827;
-          color: white;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        .back-home-button:hover {
-          background: #374151;
-        }
+      .history-page {
+        min-height: 100vh;
+        padding: 20px;
+        background: #000000;
+        color: #ffffff;
+        font-family: Arial, Helvetica, sans-serif;
+      }
 
 
-        /* SUMMARY */
+      /* ==========================================================
+        HEADER
+        ========================================================== */
+
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 18px;
+      }
+
+      .history-header h1 {
+        margin: 0 0 5px;
+        font-size: 26px;
+        color: #ffffff;
+      }
+
+      .history-header p {
+        margin: 0;
+        color: #9ca3af;
+        font-size: 13px;
+      }
+
+      .back-home-button {
+        border: 1px solid #374151;
+        border-radius: 7px;
+        padding: 9px 15px;
+        background: #111827;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .back-home-button:hover {
+        background: #1f2937;
+      }
+
+
+      /* ==========================================================
+        SUMMARY CARDS
+        ========================================================== */
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .summary-card {
+        background: #111111;
+        border: 1px solid #2a2a2a;
+        border-radius: 9px;
+        padding: 14px 16px;
+      }
+
+      .summary-card span {
+        display: block;
+        color: #9ca3af;
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+
+      .summary-card strong {
+        font-size: 21px;
+        color: #ffffff;
+      }
+
+
+      /* ==========================================================
+        TABLE CARD
+        ========================================================== */
+
+      .table-card {
+        background: #0b0b0b;
+        border: 1px solid #292929;
+        border-radius: 10px;
+        padding: 15px;
+        overflow: hidden;
+      }
+
+      .table-header {
+        margin-bottom: 12px;
+      }
+
+      .table-header h2 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        color: #ffffff;
+      }
+
+      .table-header p {
+        margin: 0;
+        color: #8f96a3;
+        font-size: 12px;
+      }
+
+
+      /* ==========================================================
+        HORIZONTAL SCROLL
+        ========================================================== */
+
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        border: 1px solid #242424;
+        border-radius: 7px;
+      }
+
+      /*
+        Compact table.
+        User can scroll horizontally to see all columns.
+      */
+
+      .decision-table {
+        width: max-content;
+        min-width: 100%;
+        border-collapse: collapse;
+        background: #050505;
+      }
+
+
+      /* ==========================================================
+        TABLE HEADER
+        ========================================================== */
+
+      .decision-table th {
+        padding: 9px 10px;
+        background: #151515;
+        border-bottom: 1px solid #333333;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        color: #b8b8b8;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+
+
+      /* ==========================================================
+        TABLE DATA
+        ========================================================== */
+
+      .decision-table td {
+        padding: 9px 10px;
+        border-bottom: 1px solid #202020;
+        font-size: 11px;
+        color: #e5e7eb;
+        white-space: nowrap;
+      }
+
+      .decision-table tbody tr:hover {
+        background: #151515;
+      }
+
+
+      /* ==========================================================
+        DIFFERENCES
+        ========================================================== */
+
+      .positive {
+        color: #ef4444 !important;
+        font-weight: 600;
+      }
+
+      .negative {
+        color: #22c55e !important;
+        font-weight: 600;
+      }
+
+      .zero {
+        color: #9ca3af !important;
+        font-weight: 600;
+      }
+
+
+      /* ==========================================================
+        STATUS
+        ========================================================== */
+
+      .status {
+        display: inline-block;
+        padding: 4px 7px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .status-success {
+        background: #12351f;
+        color: #4ade80;
+      }
+
+      .status-failed {
+        background: #3b1515;
+        color: #f87171;
+      }
+
+      .status-delayed {
+        background: #3b1515;
+        color: #f87171;
+      }
+
+      .status-on-time {
+        background: #12351f;
+        color: #4ade80;
+      }
+
+
+      /* ==========================================================
+        RISK
+        ========================================================== */
+
+      .risk-high {
+        background: #3b1515;
+        color: #f87171;
+        padding: 4px 7px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .risk-low {
+        background: #12351f;
+        color: #4ade80;
+        padding: 4px 7px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+
+      /* ==========================================================
+        SCROLLBAR
+        ========================================================== */
+
+      .table-wrapper::-webkit-scrollbar {
+        height: 8px;
+      }
+
+      .table-wrapper::-webkit-scrollbar-track {
+        background: #111111;
+      }
+
+      .table-wrapper::-webkit-scrollbar-thumb {
+        background: #444444;
+        border-radius: 10px;
+      }
+
+      .table-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #666666;
+      }
+
+
+      /* ==========================================================
+        EMPTY
+        ========================================================== */
+
+      .empty {
+        text-align: center;
+        padding: 40px;
+        color: #9ca3af;
+      }
+
+
+      /* ==========================================================
+        RESPONSIVE
+        ========================================================== */
+
+      @media (max-width: 900px) {
 
         .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 16px;
-          margin-bottom: 25px;
+          grid-template-columns: repeat(2, 1fr);
         }
 
-        .summary-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 20px;
+        .history-header {
+          flex-direction: column;
+          align-items: flex-start;
         }
 
-        .summary-card span {
-          display: block;
-          color: #6b7280;
-          font-size: 13px;
-          margin-bottom: 9px;
+      }
+
+      @media (max-width: 600px) {
+
+        .history-page {
+          padding: 12px;
         }
 
-        .summary-card strong {
-          font-size: 25px;
+        .summary-grid {
+          grid-template-columns: 1fr 1fr;
         }
 
+      }
 
-        /* TABLE CARD */
-
-        .table-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 20px;
-          overflow: hidden;
-        }
-
-        .table-header {
-          margin-bottom: 18px;
-        }
-
-        .table-header h2 {
-          margin: 0 0 5px;
-          font-size: 19px;
-        }
-
-        .table-header p {
-          margin: 0;
-          color: #6b7280;
-          font-size: 13px;
-        }
-
-
-        /* TABLE */
-
-        .table-wrapper {
-          width: 100%;
-          overflow-x: auto;
-        }
-
-        .decision-table {
-          width: 100%;
-          min-width: 1050px;
-          border-collapse: collapse;
-        }
-
-        .decision-table th {
-          padding: 13px 12px;
-          background: #f9fafb;
-          border-bottom: 1px solid #e5e7eb;
-          text-align: left;
-          font-size: 12px;
-          color: #4b5563;
-          white-space: nowrap;
-        }
-
-        .decision-table td {
-          padding: 14px 12px;
-          border-bottom: 1px solid #f0f0f0;
-          font-size: 13px;
-          white-space: nowrap;
-        }
-
-        .decision-table tbody tr:hover {
-          background: #fafafa;
-        }
-
-
-        /* STATUS */
-
-        .status {
-          display: inline-block;
-          padding: 5px 9px;
-          border-radius: 20px;
-          font-size: 11px;
-          font-weight: 600;
-        }
-
-        .status-success {
-          background: #dcfce7;
-          color: #166534;
-        }
-
-        .status-partial {
-          background: #fef3c7;
-          color: #92400e;
-        }
-
-        .status-failed {
-          background: #fee2e2;
-          color: #991b1b;
-        }
-
-        .status-other {
-          background: #e5e7eb;
-          color: #374151;
-        }
-
-
-        /* DIFFERENCE */
-
-        .positive {
-          color: #b91c1c;
-          font-weight: 600;
-        }
-
-        .negative {
-          color: #15803d;
-          font-weight: 600;
-        }
-
-
-        /* EMPTY */
-
-        .empty {
-          text-align: center;
-          padding: 50px;
-          color: #6b7280;
-        }
-
-
-        /* RESPONSIVE */
-
-        @media (max-width: 900px) {
-
-          .summary-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .history-header {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-
-        }
-
-        @media (max-width: 600px) {
-
-          .history-page {
-            padding: 16px;
-          }
-
-          .summary-grid {
-            grid-template-columns: 1fr;
-          }
-
-        }
-
-      `}</style>
-
-
+    `}</style>
       {/* ================================================== */}
       {/* HEADER */}
       {/* ================================================== */}
@@ -617,7 +592,6 @@ function DecisionHistory() {
 
         </div>
 
-
         <button
           className="back-home-button"
           onClick={() => navigate("/")}
@@ -627,9 +601,8 @@ function DecisionHistory() {
 
       </div>
 
-
       {/* ================================================== */}
-      {/* SUMMARY CARDS */}
+      {/* SUMMARY */}
       {/* ================================================== */}
 
       <div className="summary-grid">
@@ -646,7 +619,6 @@ function DecisionHistory() {
 
         </div>
 
-
         <div className="summary-card">
 
           <span>
@@ -659,19 +631,17 @@ function DecisionHistory() {
 
         </div>
 
-
         <div className="summary-card">
 
           <span>
-            Partially Successful
+            Delayed Shipments
           </span>
 
           <strong>
-            {partial}
+            {delayed}
           </strong>
 
         </div>
-
 
         <div className="summary-card">
 
@@ -687,9 +657,8 @@ function DecisionHistory() {
 
       </div>
 
-
       {/* ================================================== */}
-      {/* DECISION TABLE */}
+      {/* TABLE */}
       {/* ================================================== */}
 
       <div className="table-card">
@@ -701,11 +670,10 @@ function DecisionHistory() {
           </h2>
 
           <p>
-            Expected vs actual performance from the closed-loop process
+            Predicted vs actual performance from the closed-loop process
           </p>
 
         </div>
-
 
         {data.length === 0 ? (
 
@@ -723,249 +691,338 @@ function DecisionHistory() {
 
                 <tr>
 
-                  <th>
-                    Decision ID
-                  </th>
+                  <th>Decision ID</th>
 
-                  <th>
-                    Shipment ID
-                  </th>
+                  <th>Shipment ID</th>
 
-                  <th>
-                    Decision Date
-                  </th>
+                  <th>Date</th>
 
-                  <th>
-                    Recommended Action
-                  </th>
+                  <th>Category</th>
 
-                  <th>
-                    Selected Action
-                  </th>
+                  <th>Market</th>
 
-                  <th>
-                    Expected Cost
-                  </th>
+                  <th>Region</th>
 
-                  <th>
-                    Actual Cost
-                  </th>
+                  <th>Country</th>
 
-                  <th>
-                    Cost Difference
-                  </th>
+                  <th>City</th>
 
-                  <th>
-                    Expected Delay
-                  </th>
+                  <th>Shipping Mode</th>
 
-                  <th>
-                    Actual Delay
-                  </th>
+                  <th>Quantity</th>
 
-                  <th>
-                    Delay Difference
-                  </th>
+                  <th>Risk</th>
 
-                  <th>
-                    Success
-                  </th>
+                  <th>Recommended Action</th>
+
+                  <th>Expected Delivery</th>
+
+                  <th>Actual Delivery</th>
+
+                  <th>Delivery Difference</th>
+
+                  <th>Expected Cost</th>
+
+                  <th>Actual Cost</th>
+
+                  <th>Cost Difference</th>
+
+                  <th>Delivery Status</th>
+
+                  <th>Outcome</th>
 
                 </tr>
 
               </thead>
 
-
               <tbody>
 
                 {data.map((row, index) => {
 
-                  const expectedCost = getNumber(
-                    row,
-                    [
-                      "Expected_Cost",
-                      "expected_cost",
-                      "Expected Cost",
-                    ]
-                  );
+                  const expectedDelivery =
+                    getNumber(
+                      row,
+                      "expected_delivery_days"
+                    );
 
-                  const actualCost = getNumber(
-                    row,
-                    [
-                      "Actual_Cost",
-                      "actual_cost",
-                      "Actual Cost",
-                    ]
-                  );
+                  const actualDelivery =
+                    getNumber(
+                      row,
+                      "actual_delivery_days"
+                    );
 
-                  const expectedDelay = getNumber(
-                    row,
-                    [
-                      "Expected_Delay_Days",
-                      "expected_delay_days",
-                      "Expected Delay Days",
-                    ]
-                  );
+                  const expectedCost =
+                    getNumber(
+                      row,
+                      "expected_cost"
+                    );
 
-                  const actualDelay = getNumber(
-                    row,
-                    [
-                      "Actual_Delay_Days",
-                      "actual_delay_days",
-                      "Actual Delay Days",
-                    ]
-                  );
+                  const actualCost =
+                    getNumber(
+                      row,
+                      "actual_cost"
+                    );
+
+                  /*
+                   * Positive delivery difference means
+                   * actual delivery took more days.
+                   */
+
+                  const deliveryDifference =
+                    actualDelivery -
+                    expectedDelivery;
+
+                  /*
+                   * Positive cost difference means
+                   * actual cost was higher.
+                   */
 
                   const costDifference =
-                    actualCost - expectedCost;
+                    actualCost -
+                    expectedCost;
 
-                  const delayDifference =
-                    actualDelay - expectedDelay;
+                  const risk =
+                    getNumber(
+                      row,
+                      "Late_delivery_risk"
+                    );
 
+                  const outcome =
+                    getValue(
+                      row,
+                      "outcome_status"
+                    );
 
-                  const success = getValue(
-                    row,
-                    [
-                      "Decision_Success",
-                      "decision_success",
-                      "Decision Success",
-                    ]
-                  );
+                  const deliveryStatus =
+                    getValue(
+                      row,
+                      "delivery_status"
+                    );
 
+                  const outcomeClass =
+                    outcome.toLowerCase() ===
+                    "successful"
+                      ? "status-success"
+                      : "status-failed";
 
-                  const successText =
-                    String(success).toLowerCase();
-
-
-                  let statusClass =
-                    "status-other";
-
-
-                  if (
-                    successText === "successful"
-                  ) {
-
-                    statusClass =
-                      "status-success";
-
-                  } else if (
-                    successText.includes("partial")
-                  ) {
-
-                    statusClass =
-                      "status-partial";
-
-                  } else if (
-                    successText.includes("unsuccessful")
-                  ) {
-
-                    statusClass =
-                      "status-failed";
-
-                  }
-
+                  const deliveryClass =
+                    deliveryStatus
+                      .toLowerCase()
+                      .includes("delayed")
+                      ? "status-delayed"
+                      : "status-on-time";
 
                   return (
 
                     <tr key={index}>
 
+                      {/* Decision ID */}
+
                       <td>
-                        {getValue(
-                          row,
-                          [
-                            "Decision_ID",
-                            "decision_id",
-                            "Decision ID",
-                          ]
-                        )}
+                        DEC-
+                        {String(index + 1)
+                          .padStart(4, "0")}
                       </td>
+
+                      {/* Shipment ID */}
 
                       <td>
                         {getValue(
                           row,
-                          [
-                            "Shipment_ID",
-                            "shipment_id",
-                            "Shipment ID",
-                          ]
+                          "Shipment_ID"
                         )}
                       </td>
+
+                      {/* Date */}
 
                       <td>
                         {getValue(
                           row,
-                          [
-                            "Decision_Date",
-                            "decision_date",
-                            "Decision Date",
-                          ]
+                          "Shipment_Date"
                         )}
                       </td>
+
+                      {/* Category */}
 
                       <td>
                         {getValue(
                           row,
-                          [
-                            "Recommended_Action",
-                            "recommended_action",
-                            "Recommended Action",
-                          ]
+                          "Category_Name"
                         )}
                       </td>
+
+                      {/* Market */}
 
                       <td>
                         {getValue(
                           row,
-                          [
-                            "Selected_Action",
-                            "selected_action",
-                            "Selected Action",
-                          ]
+                          "Market"
                         )}
                       </td>
 
-                      <td>
-                        {currency(expectedCost)}
-                      </td>
+                      {/* Region */}
 
                       <td>
-                        {currency(actualCost)}
+                        {getValue(
+                          row,
+                          "Order_Region"
+                        )}
                       </td>
+
+                      {/* Country */}
+
+                      <td>
+                        {getValue(
+                          row,
+                          "Customer_Country"
+                        )}
+                      </td>
+
+                      {/* City */}
+
+                      <td>
+                        {getValue(
+                          row,
+                          "Customer_City"
+                        )}
+                      </td>
+
+                      {/* Shipping Mode */}
+
+                      <td>
+                        {getValue(
+                          row,
+                          "Shipping_Mode"
+                        )}
+                      </td>
+
+                      {/* Quantity */}
+
+                      <td>
+                        {getValue(
+                          row,
+                          "Order_Item_Quantity"
+                        )}
+                      </td>
+
+                      {/* Risk */}
+
+                      <td>
+
+                        {risk === 1 ? (
+
+                          <span className="risk-high">
+                            High
+                          </span>
+
+                        ) : (
+
+                          <span className="risk-low">
+                            Low
+                          </span>
+
+                        )}
+
+                      </td>
+
+                      {/* Recommended Action */}
+
+                      <td>
+                        {getValue(
+                          row,
+                          "recommended_action"
+                        )}
+                      </td>
+
+                      {/* Expected Delivery */}
+
+                      <td>
+                        {expectedDelivery} days
+                      </td>
+
+                      {/* Actual Delivery */}
+
+                      <td>
+                        {actualDelivery} days
+                      </td>
+
+                      {/* Delivery Difference */}
+
+                      <td
+                        className={
+                          deliveryDifference > 0
+                            ? "positive"
+                            : deliveryDifference < 0
+                            ? "negative"
+                            : "zero"
+                        }
+                      >
+
+                        {deliveryDifference > 0
+                          ? `+${deliveryDifference}`
+                          : deliveryDifference}{" "}
+                        days
+
+                      </td>
+
+                      {/* Expected Cost */}
+
+                      <td>
+                        {currency(
+                          expectedCost
+                        )}
+                      </td>
+
+                      {/* Actual Cost */}
+
+                      <td>
+                        {currency(
+                          actualCost
+                        )}
+                      </td>
+
+                      {/* Cost Difference */}
 
                       <td
                         className={
                           costDifference > 0
                             ? "positive"
-                            : "negative"
+                            : costDifference < 0
+                            ? "negative"
+                            : "zero"
                         }
                       >
-                        {currency(costDifference)}
+
+                        {costDifference > 0
+                          ? "+"
+                          : ""}
+
+                        {currency(
+                          costDifference
+                        )}
+
                       </td>
 
-                      <td>
-                        {expectedDelay} days
-                      </td>
-
-                      <td>
-                        {actualDelay} days
-                      </td>
-
-                      <td
-                        className={
-                          delayDifference > 0
-                            ? "positive"
-                            : "negative"
-                        }
-                      >
-                        {delayDifference} days
-                      </td>
+                      {/* Delivery Status */}
 
                       <td>
 
                         <span
-                          className={`status ${statusClass}`}
+                          className={`status ${deliveryClass}`}
                         >
-                          {success}
+                          {deliveryStatus}
+                        </span>
+
+                      </td>
+
+                      {/* Outcome */}
+
+                      <td>
+
+                        <span
+                          className={`status ${outcomeClass}`}
+                        >
+                          {outcome}
                         </span>
 
                       </td>
@@ -987,10 +1044,7 @@ function DecisionHistory() {
       </div>
 
     </div>
-
   );
-
 }
-
 
 export default DecisionHistory;

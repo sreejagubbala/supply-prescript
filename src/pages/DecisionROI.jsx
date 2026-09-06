@@ -16,9 +16,8 @@ import {
 
 import { useNavigate } from "react-router-dom";
 
-
 // ============================================================
-// WEEK 1 ROI DATA
+// DATA
 // ============================================================
 
 const costData = [
@@ -88,13 +87,13 @@ const marketData = [
   },
 ];
 
-
 // ============================================================
-// DECISION ROI PAGE
+// DECISION ROI
 // ============================================================
 
 function DecisionROI() {
-
+  // IMPORTANT:
+  // Hook must be inside component but BEFORE return.
   const navigate = useNavigate();
 
   return (
@@ -117,6 +116,10 @@ function DecisionROI() {
           color: #111827;
           font-family: Arial, Helvetica, sans-serif;
         }
+
+        /* ==================================================
+           HEADER
+        ================================================== */
 
         .roi-header {
           display: flex;
@@ -180,8 +183,9 @@ function DecisionROI() {
           transform: translateY(-1px);
         }
 
-
-        /* KPI CARDS */
+        /* ==================================================
+           KPI CARDS
+        ================================================== */
 
         .kpi-grid {
           display: grid;
@@ -220,8 +224,9 @@ function DecisionROI() {
           font-size: 12px;
         }
 
-
-        /* CHART GRID */
+        /* ==================================================
+           CHART GRID
+        ================================================== */
 
         .chart-grid {
           display: grid;
@@ -252,8 +257,9 @@ function DecisionROI() {
           margin-bottom: 20px;
         }
 
-
-        /* ROI SUMMARY */
+        /* ==================================================
+           ROI SUMMARY
+        ================================================== */
 
         .roi-summary {
           background: white;
@@ -298,8 +304,9 @@ function DecisionROI() {
           font-size: 21px;
         }
 
-
-        /* CLOSED LOOP */
+        /* ==================================================
+           CLOSED LOOP
+        ================================================== */
 
         .closed-loop {
           background: white;
@@ -357,8 +364,9 @@ function DecisionROI() {
           color: #9ca3af;
         }
 
-
-        /* RESPONSIVE */
+        /* ==================================================
+           RESPONSIVE
+        ================================================== */
 
         @media (max-width: 1100px) {
 
@@ -431,7 +439,6 @@ function DecisionROI() {
 
       `}</style>
 
-
       {/* ================================================== */}
       {/* HEADER */}
       {/* ================================================== */}
@@ -450,7 +457,6 @@ function DecisionROI() {
 
         </div>
 
-
         <div className="roi-header-actions">
 
           <div className="roi-status">
@@ -460,7 +466,6 @@ function DecisionROI() {
             Analytics Active
 
           </div>
-
 
           <button
             className="back-home-button"
@@ -473,7 +478,6 @@ function DecisionROI() {
 
       </div>
 
-
       {/* ================================================== */}
       {/* KPI CARDS */}
       {/* ================================================== */}
@@ -481,56 +485,106 @@ function DecisionROI() {
       <div className="kpi-grid">
 
         <div className="kpi-card">
-          <div className="kpi-icon">📦</div>
-          <div className="kpi-title">Total Shipments</div>
-          <div className="kpi-value">20</div>
+
+          <div className="kpi-icon">
+            📦
+          </div>
+
+          <div className="kpi-title">
+            Total Shipments
+          </div>
+
+          <div className="kpi-value">
+            20
+          </div>
+
           <div className="kpi-subtitle">
             Evaluated shipments
           </div>
+
         </div>
 
-
         <div className="kpi-card">
-          <div className="kpi-icon">💰</div>
-          <div className="kpi-title">Cost Saving</div>
-          <div className="kpi-value">₹2,350</div>
+
+          <div className="kpi-icon">
+            💰
+          </div>
+
+          <div className="kpi-title">
+            Cost Saving
+          </div>
+
+          <div className="kpi-value">
+            ₹2,350
+          </div>
+
           <div className="kpi-subtitle">
             Total estimated saving
           </div>
+
         </div>
 
-
         <div className="kpi-card">
-          <div className="kpi-icon">🚚</div>
-          <div className="kpi-title">On-Time Rate</div>
-          <div className="kpi-value">75%</div>
+
+          <div className="kpi-icon">
+            🚚
+          </div>
+
+          <div className="kpi-title">
+            On-Time Rate
+          </div>
+
+          <div className="kpi-value">
+            75%
+          </div>
+
           <div className="kpi-subtitle">
             Delivery performance
           </div>
+
         </div>
 
-
         <div className="kpi-card">
-          <div className="kpi-icon">✓</div>
-          <div className="kpi-title">Action Success</div>
-          <div className="kpi-value">76%</div>
+
+          <div className="kpi-icon">
+            ✓
+          </div>
+
+          <div className="kpi-title">
+            Action Success
+          </div>
+
+          <div className="kpi-value">
+            76%
+          </div>
+
           <div className="kpi-subtitle">
             Successful prescriptions
           </div>
+
         </div>
 
-
         <div className="kpi-card">
-          <div className="kpi-icon">📈</div>
-          <div className="kpi-title">ROI</div>
-          <div className="kpi-value">18.8%</div>
+
+          <div className="kpi-icon">
+            📈
+          </div>
+
+          <div className="kpi-title">
+            ROI
+          </div>
+
+          <div className="kpi-value">
+            18.8%
+          </div>
+
           <div className="kpi-subtitle">
             Return on prescription
           </div>
+
         </div>
 
       </div>
-
 
       {/* ================================================== */}
       {/* COST + DELIVERY */}
@@ -573,7 +627,6 @@ function DecisionROI() {
 
         </div>
 
-
         <div className="chart-card">
 
           <h2>
@@ -599,7 +652,9 @@ function DecisionROI() {
               >
 
                 {deliveryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} />
+                  <Cell
+                    key={`cell-${index}`}
+                  />
                 ))}
 
               </Pie>
@@ -615,7 +670,6 @@ function DecisionROI() {
         </div>
 
       </div>
-
 
       {/* ================================================== */}
       {/* ACTION + SHIPPING MODE */}
@@ -656,7 +710,6 @@ function DecisionROI() {
 
         </div>
 
-
         <div className="chart-card">
 
           <h2>
@@ -696,7 +749,6 @@ function DecisionROI() {
         </div>
 
       </div>
-
 
       {/* ================================================== */}
       {/* MARKET ANALYTICS */}
@@ -739,7 +791,6 @@ function DecisionROI() {
 
       </div>
 
-
       {/* ================================================== */}
       {/* ROI SUMMARY */}
       {/* ================================================== */}
@@ -758,33 +809,59 @@ function DecisionROI() {
 
         </div>
 
-
         <div className="summary-grid">
 
           <div className="summary-item">
-            <span>Expected Cost</span>
-            <strong>₹12,500</strong>
+
+            <span>
+              Expected Cost
+            </span>
+
+            <strong>
+              ₹12,500
+            </strong>
+
           </div>
 
           <div className="summary-item">
-            <span>Actual Cost</span>
-            <strong>₹10,150</strong>
+
+            <span>
+              Actual Cost
+            </span>
+
+            <strong>
+              ₹10,150
+            </strong>
+
           </div>
 
           <div className="summary-item">
-            <span>Total Saving</span>
-            <strong>₹2,350</strong>
+
+            <span>
+              Total Saving
+            </span>
+
+            <strong>
+              ₹2,350
+            </strong>
+
           </div>
 
           <div className="summary-item">
-            <span>ROI</span>
-            <strong>18.8%</strong>
+
+            <span>
+              ROI
+            </span>
+
+            <strong>
+              18.8%
+            </strong>
+
           </div>
 
         </div>
 
       </div>
-
 
       {/* ================================================== */}
       {/* CLOSED LOOP */}
@@ -799,41 +876,99 @@ function DecisionROI() {
         <div className="loop">
 
           <div className="loop-step">
-            <div className="loop-number">1</div>
-            <strong>Prediction</strong>
-            <span>Risk is identified</span>
+
+            <div className="loop-number">
+              1
+            </div>
+
+            <strong>
+              Prediction
+            </strong>
+
+            <span>
+              Risk is identified
+            </span>
+
           </div>
 
-          <div className="loop-arrow">→</div>
-
-          <div className="loop-step">
-            <div className="loop-number">2</div>
-            <strong>Recommendation</strong>
-            <span>Best action prescribed</span>
+          <div className="loop-arrow">
+            →
           </div>
 
-          <div className="loop-arrow">→</div>
-
           <div className="loop-step">
-            <div className="loop-number">3</div>
-            <strong>Decision</strong>
-            <span>Manager selects action</span>
+
+            <div className="loop-number">
+              2
+            </div>
+
+            <strong>
+              Recommendation
+            </strong>
+
+            <span>
+              Best action prescribed
+            </span>
+
           </div>
 
-          <div className="loop-arrow">→</div>
-
-          <div className="loop-step">
-            <div className="loop-number">4</div>
-            <strong>Outcome</strong>
-            <span>Actual result recorded</span>
+          <div className="loop-arrow">
+            →
           </div>
 
-          <div className="loop-arrow">→</div>
+          <div className="loop-step">
+
+            <div className="loop-number">
+              3
+            </div>
+
+            <strong>
+              Decision
+            </strong>
+
+            <span>
+              Manager selects action
+            </span>
+
+          </div>
+
+          <div className="loop-arrow">
+            →
+          </div>
 
           <div className="loop-step">
-            <div className="loop-number">5</div>
-            <strong>Learning</strong>
-            <span>System improves</span>
+
+            <div className="loop-number">
+              4
+            </div>
+
+            <strong>
+              Outcome
+            </strong>
+
+            <span>
+              Actual result recorded
+            </span>
+
+          </div>
+
+          <div className="loop-arrow">
+            →
+          </div>
+
+          <div className="loop-step">
+
+            <div className="loop-number">
+              5
+            </div>
+
+            <strong>
+              Learning
+            </strong>
+
+            <span>
+              System improves
+            </span>
+
           </div>
 
         </div>
@@ -843,6 +978,5 @@ function DecisionROI() {
     </div>
   );
 }
-
 
 export default DecisionROI;
