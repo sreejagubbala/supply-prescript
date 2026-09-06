@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchOperationsSummary } from '../api/shipments'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -52,15 +53,25 @@ function Operations() {
   const [trendData, setTrendData] = useState([])
   const [shipments, setShipments] = useState([])
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setKpis(mockKpis)
-      setTrendData(mockTrendData)
-      setShipments(mockShipments)
-      setLoading(false)
-    }, 200)
-
-    return () => clearTimeout(timer)
+    useEffect(() => {
+    fetchOperationsSummary()
+      .then((data) => {
+        setKpis([
+          { label: 'Total Shipments', value: data.totalShipments, icon: Truck, color: 'purple' },
+          { label: 'On-Time', value: data.onTimeCount, icon: CheckCircle, color: 'green' },
+          { label: 'Delayed', value: data.delayedCount, icon: AlertTriangle, color: 'red' },
+        ])
+        setTrendData(data.trendData)
+        setShipments(mockShipments) // recent shipments list — swap this once that endpoint is confirmed
+        setLoading(false)
+      })
+      .catch(() => {
+        console.warn('Backend not available yet — using mock data')
+        setKpis(mockKpis)
+        setTrendData(mockTrendData)
+        setShipments(mockShipments)
+        setLoading(false)
+      })
   }, [])
 
   const onTimeCount = kpis.find((k) => k.label === 'On-Time')?.value || 0
