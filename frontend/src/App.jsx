@@ -7,7 +7,6 @@ import Suppliers from './pages/Suppliers'
 import Analytics from './pages/Analytics'
 import DecisionROI from './pages/DecisionROI'
 import DecisionHistory from './pages/DecisionHistory'
-import Feedback from './pages/Feedback'
 
 function App() {
   return (
