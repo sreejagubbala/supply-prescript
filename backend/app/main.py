@@ -5,6 +5,7 @@ from .routes import shipments
 from .routes import database
 from .routes import suppliers
 from .routes import operations
+from .routes import predictions
 
 
 app = FastAPI(
@@ -51,6 +52,10 @@ app.include_router(
 
 app.include_router(
     operations.router
+)
+
+app.include_router(
+    predictions.router
 )
 
 
