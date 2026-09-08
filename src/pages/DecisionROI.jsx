@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -17,91 +18,356 @@ import {
 import { useNavigate } from "react-router-dom";
 
 // ============================================================
-// DATA
+// API
 // ============================================================
 
-const costData = [
-  { name: "Expected", cost: 12500 },
-  { name: "Actual", cost: 10150 },
-];
+const API_BASE_URL = "http://127.0.0.1:8000";
 
-const deliveryData = [
-  { name: "On Time", value: 75 },
-  { name: "Delayed", value: 25 },
-];
+// ============================================================
+// NUMBER FORMAT
+// ============================================================
 
-const actionData = [
-  {
-    action: "Upgrade Shipping",
-    successRate: 82,
-  },
-  {
-    action: "Prioritize",
-    successRate: 76,
-  },
-  {
-    action: "Split Shipment",
-    successRate: 70,
-  },
-];
+function number(value) {
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
 
-const shippingModeData = [
-  {
-    mode: "Standard Class",
-    savings: 980,
-  },
-  {
-    mode: "Second Class",
-    savings: 620,
-  },
-  {
-    mode: "First Class",
-    savings: 450,
-  },
-  {
-    mode: "Same Day",
-    savings: 300,
-  },
-];
+// ============================================================
+// CURRENCY
+// ============================================================
 
-const marketData = [
-  {
-    market: "Pacific Asia",
-    savings: 620,
-  },
-  {
-    market: "Europe",
-    savings: 540,
-  },
-  {
-    market: "USCA",
-    savings: 480,
-  },
-  {
-    market: "LATAM",
-    savings: 390,
-  },
-  {
-    market: "Africa",
-    savings: 280,
-  },
-];
+function currency(value) {
+  return `₹${number(value).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 // ============================================================
 // DECISION ROI
 // ============================================================
 
 function DecisionROI() {
-  // IMPORTANT:
-  // Hook must be inside component but BEFORE return.
   const navigate = useNavigate();
+
+  const [summary, setSummary] = useState(null);
+  const [actionData, setActionData] = useState([]);
+  const [marketData, setMarketData] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // ==========================================================
+  // LOAD ROI DATA FROM MEMBER 5 BACKEND
+  // ==========================================================
+
+  useEffect(() => {
+    async function loadROIData() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [
+          summaryResponse,
+          actionResponse,
+          marketResponse,
+        ] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/roi/`),
+          fetch(`${API_BASE_URL}/api/roi/by-action`),
+          fetch(`${API_BASE_URL}/api/roi/by-market`),
+        ]);
+
+        if (!summaryResponse.ok) {
+          throw new Error("Unable to load ROI summary.");
+        }
+
+        if (!actionResponse.ok) {
+          throw new Error("Unable to load ROI by action.");
+        }
+
+        if (!marketResponse.ok) {
+          throw new Error("Unable to load ROI by market.");
+        }
+
+        const summaryResult =
+          await summaryResponse.json();
+
+        const actionResult =
+          await actionResponse.json();
+
+        const marketResult =
+          await marketResponse.json();
+
+        setSummary(summaryResult);
+
+        setActionData(
+          Array.isArray(actionResult.data)
+            ? actionResult.data
+            : []
+        );
+
+        setMarketData(
+          Array.isArray(marketResult.data)
+            ? marketResult.data
+            : []
+        );
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          "Unable to connect to the Closed-Loop Analytics backend."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadROIData();
+  }, []);
+
+  // ==========================================================
+  // LOADING
+  // ==========================================================
+
+  if (loading) {
+    return (
+      <div className="roi-page loading-page">
+        <div className="loading-box">
+          <div className="loading-spinner">
+            ⟳
+          </div>
+
+          <h2>
+            Loading Decision ROI...
+          </h2>
+
+          <p>
+            Reading closed-loop analytics from backend
+          </p>
+        </div>
+
+        <style>{`
+
+          .loading-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f7f8fa;
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .loading-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            text-align: center;
+          }
+
+          .loading-spinner {
+            font-size: 35px;
+            margin-bottom: 12px;
+          }
+
+          .loading-box h2 {
+            margin: 0 0 8px;
+          }
+
+          .loading-box p {
+            margin: 0;
+            color: #6b7280;
+          }
+
+        `}</style>
+      </div>
+    );
+  }
+
+  // ==========================================================
+  // ERROR
+  // ==========================================================
+
+  if (error) {
+    return (
+      <div className="roi-page error-page">
+
+        <div className="error-box">
+
+          <h2>
+            ROI Data Error
+          </h2>
+
+          <p>
+            {error}
+          </p>
+
+          <p className="error-help">
+            Make sure the FastAPI backend is running on
+            port 8000 and decision outcome data exists.
+          </p>
+
+          <div className="error-actions">
+
+            <button
+              className="retry-button"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+
+            <button
+              className="back-home-button"
+              onClick={() => navigate("/")}
+            >
+              ← Back to Home
+            </button>
+
+          </div>
+
+        </div>
+
+        <style>{`
+
+          .error-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f7f8fa;
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .error-box {
+            width: min(600px, 90%);
+            padding: 30px;
+            background: white;
+            border: 1px solid #fecaca;
+            border-radius: 12px;
+            text-align: center;
+          }
+
+          .error-box h2 {
+            color: #991b1b;
+            margin-top: 0;
+          }
+
+          .error-box p {
+            color: #6b7280;
+          }
+
+          .error-help {
+            font-size: 13px;
+          }
+
+          .error-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+          }
+
+          .retry-button,
+          .back-home-button {
+            border: none;
+            border-radius: 8px;
+            padding: 11px 17px;
+            cursor: pointer;
+            font-weight: 600;
+          }
+
+          .retry-button {
+            background: #111827;
+            color: white;
+          }
+
+          .back-home-button {
+            background: #e5e7eb;
+            color: #111827;
+          }
+
+        `}</style>
+
+      </div>
+    );
+  }
+
+  // ==========================================================
+  // SAFE SUMMARY VALUES
+  // ==========================================================
+
+  const totalDecisions =
+    number(summary?.total_decisions);
+
+  const expectedCost =
+    number(summary?.expected_cost);
+
+  const actualCost =
+    number(summary?.actual_cost);
+
+  const savings =
+    number(summary?.savings);
+
+  const roiPercentage =
+    number(summary?.roi_percentage);
+
+  const successRate =
+    number(summary?.success_rate);
+
+  const onTimeRate =
+    number(summary?.on_time_rate);
+
+  // ==========================================================
+  // DELIVERY DATA
+  // ==========================================================
+
+  const deliveryData = [
+    {
+      name: "On Time",
+      value: onTimeRate,
+    },
+    {
+      name: "Delayed",
+      value: Math.max(0, 100 - onTimeRate),
+    },
+  ];
+
+  // ==========================================================
+  // ACTION DATA
+  // ==========================================================
+
+  const formattedActionData =
+    actionData.map((item) => ({
+      action:
+        item.Selected_Action ||
+        item.selected_action ||
+        "Unknown",
+
+      successRate:
+        number(item.success_rate),
+    }));
+
+  // ==========================================================
+  // MARKET DATA
+  // ==========================================================
+
+  const formattedMarketData =
+    marketData.map((item) => ({
+      market:
+        item.Market ||
+        item.market ||
+        "Unknown",
+
+      savings:
+        number(item.savings),
+    }));
+
+  // ==========================================================
+  // MAIN PAGE
+  // ==========================================================
 
   return (
     <div className="roi-page">
-
-      {/* ================================================== */}
-      {/* INLINE CSS */}
-      {/* ================================================== */}
 
       <style>{`
 
@@ -117,9 +383,7 @@ function DecisionROI() {
           font-family: Arial, Helvetica, sans-serif;
         }
 
-        /* ==================================================
-           HEADER
-        ================================================== */
+        /* HEADER */
 
         .roi-header {
           display: flex;
@@ -163,7 +427,6 @@ function DecisionROI() {
           height: 9px;
           background: #22c55e;
           border-radius: 50%;
-          display: inline-block;
         }
 
         .back-home-button {
@@ -175,17 +438,13 @@ function DecisionROI() {
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          transition: 0.2s;
         }
 
         .back-home-button:hover {
           background: #374151;
-          transform: translateY(-1px);
         }
 
-        /* ==================================================
-           KPI CARDS
-        ================================================== */
+        /* KPI */
 
         .kpi-grid {
           display: grid;
@@ -224,9 +483,7 @@ function DecisionROI() {
           font-size: 12px;
         }
 
-        /* ==================================================
-           CHART GRID
-        ================================================== */
+        /* CHARTS */
 
         .chart-grid {
           display: grid;
@@ -257,9 +514,7 @@ function DecisionROI() {
           margin-bottom: 20px;
         }
 
-        /* ==================================================
-           ROI SUMMARY
-        ================================================== */
+        /* SUMMARY */
 
         .roi-summary {
           background: white;
@@ -304,9 +559,7 @@ function DecisionROI() {
           font-size: 21px;
         }
 
-        /* ==================================================
-           CLOSED LOOP
-        ================================================== */
+        /* CLOSED LOOP */
 
         .closed-loop {
           background: white;
@@ -364,16 +617,12 @@ function DecisionROI() {
           color: #9ca3af;
         }
 
-        /* ==================================================
-           RESPONSIVE
-        ================================================== */
+        /* RESPONSIVE */
 
         @media (max-width: 1100px) {
-
           .kpi-grid {
             grid-template-columns: repeat(3, 1fr);
           }
-
         }
 
         @media (max-width: 800px) {
@@ -429,19 +678,11 @@ function DecisionROI() {
             align-items: stretch;
           }
 
-          .roi-status,
-          .back-home-button {
-            justify-content: center;
-            text-align: center;
-          }
-
         }
 
       `}</style>
 
-      {/* ================================================== */}
       {/* HEADER */}
-      {/* ================================================== */}
 
       <div className="roi-header">
 
@@ -478,9 +719,7 @@ function DecisionROI() {
 
       </div>
 
-      {/* ================================================== */}
       {/* KPI CARDS */}
-      {/* ================================================== */}
 
       <div className="kpi-grid">
 
@@ -491,15 +730,15 @@ function DecisionROI() {
           </div>
 
           <div className="kpi-title">
-            Total Shipments
+            Total Decisions
           </div>
 
           <div className="kpi-value">
-            20
+            {totalDecisions}
           </div>
 
           <div className="kpi-subtitle">
-            Evaluated shipments
+            Evaluated decisions
           </div>
 
         </div>
@@ -515,11 +754,11 @@ function DecisionROI() {
           </div>
 
           <div className="kpi-value">
-            ₹2,350
+            {currency(savings)}
           </div>
 
           <div className="kpi-subtitle">
-            Total estimated saving
+            Expected vs actual cost
           </div>
 
         </div>
@@ -535,7 +774,7 @@ function DecisionROI() {
           </div>
 
           <div className="kpi-value">
-            75%
+            {onTimeRate.toFixed(1)}%
           </div>
 
           <div className="kpi-subtitle">
@@ -555,7 +794,7 @@ function DecisionROI() {
           </div>
 
           <div className="kpi-value">
-            76%
+            {successRate.toFixed(1)}%
           </div>
 
           <div className="kpi-subtitle">
@@ -575,7 +814,7 @@ function DecisionROI() {
           </div>
 
           <div className="kpi-value">
-            18.8%
+            {roiPercentage.toFixed(1)}%
           </div>
 
           <div className="kpi-subtitle">
@@ -586,9 +825,7 @@ function DecisionROI() {
 
       </div>
 
-      {/* ================================================== */}
       {/* COST + DELIVERY */}
-      {/* ================================================== */}
 
       <div className="chart-grid">
 
@@ -602,17 +839,37 @@ function DecisionROI() {
             Cost impact after applying prescriptions
           </p>
 
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer
+            width="100%"
+            height={300}
+          >
 
-            <BarChart data={costData}>
+            <BarChart
+              data={[
+                {
+                  name: "Expected",
+                  cost: expectedCost,
+                },
+                {
+                  name: "Actual",
+                  cost: actualCost,
+                },
+              ]}
+            >
 
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+              />
 
               <XAxis dataKey="name" />
 
               <YAxis />
 
-              <Tooltip />
+              <Tooltip
+                formatter={(value) =>
+                  currency(value)
+                }
+              />
 
               <Legend />
 
@@ -637,7 +894,10 @@ function DecisionROI() {
             On-time vs delayed shipments
           </p>
 
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer
+            width="100%"
+            height={300}
+          >
 
             <PieChart>
 
@@ -651,11 +911,13 @@ function DecisionROI() {
                 label
               >
 
-                {deliveryData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                  />
-                ))}
+                {deliveryData.map(
+                  (entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                    />
+                  )
+                )}
 
               </Pie>
 
@@ -671,9 +933,7 @@ function DecisionROI() {
 
       </div>
 
-      {/* ================================================== */}
-      {/* ACTION + SHIPPING MODE */}
-      {/* ================================================== */}
+      {/* ACTION + MARKET */}
 
       <div className="chart-grid">
 
@@ -684,20 +944,35 @@ function DecisionROI() {
           </h2>
 
           <p>
-            Success rate by recommended action
+            Success rate by selected action
           </p>
 
-          <ResponsiveContainer width="100%" height={320}>
+          <ResponsiveContainer
+            width="100%"
+            height={320}
+          >
 
-            <BarChart data={actionData}>
+            <BarChart
+              data={formattedActionData}
+            >
 
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+              />
 
-              <XAxis dataKey="action" />
+              <XAxis
+                dataKey="action"
+              />
 
-              <YAxis domain={[0, 100]} />
+              <YAxis
+                domain={[0, 100]}
+              />
 
-              <Tooltip />
+              <Tooltip
+                formatter={(value) =>
+                  `${number(value).toFixed(1)}%`
+                }
+              />
 
               <Bar
                 dataKey="successRate"
@@ -713,21 +988,28 @@ function DecisionROI() {
         <div className="chart-card">
 
           <h2>
-            Savings by Shipping Mode
+            Savings by Market
           </h2>
 
           <p>
-            Cost saving generated by shipping mode
+            Cost saving generated across markets
           </p>
 
-          <ResponsiveContainer width="100%" height={320}>
+          <ResponsiveContainer
+            width="100%"
+            height={320}
+          >
 
-            <BarChart data={shippingModeData}>
+            <BarChart
+              data={formattedMarketData}
+            >
 
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+              />
 
               <XAxis
-                dataKey="mode"
+                dataKey="market"
                 angle={-15}
                 textAnchor="end"
                 height={70}
@@ -735,7 +1017,11 @@ function DecisionROI() {
 
               <YAxis />
 
-              <Tooltip />
+              <Tooltip
+                formatter={(value) =>
+                  currency(value)
+                }
+              />
 
               <Bar
                 dataKey="savings"
@@ -750,9 +1036,7 @@ function DecisionROI() {
 
       </div>
 
-      {/* ================================================== */}
       {/* MARKET ANALYTICS */}
-      {/* ================================================== */}
 
       <div className="chart-card full-chart">
 
@@ -764,17 +1048,30 @@ function DecisionROI() {
           Prescription impact across markets
         </p>
 
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer
+          width="100%"
+          height={320}
+        >
 
-          <LineChart data={marketData}>
+          <LineChart
+            data={formattedMarketData}
+          >
 
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid
+              strokeDasharray="3 3"
+            />
 
-            <XAxis dataKey="market" />
+            <XAxis
+              dataKey="market"
+            />
 
             <YAxis />
 
-            <Tooltip />
+            <Tooltip
+              formatter={(value) =>
+                currency(value)
+              }
+            />
 
             <Legend />
 
@@ -791,9 +1088,7 @@ function DecisionROI() {
 
       </div>
 
-      {/* ================================================== */}
       {/* ROI SUMMARY */}
-      {/* ================================================== */}
 
       <div className="roi-summary">
 
@@ -818,7 +1113,7 @@ function DecisionROI() {
             </span>
 
             <strong>
-              ₹12,500
+              {currency(expectedCost)}
             </strong>
 
           </div>
@@ -830,7 +1125,7 @@ function DecisionROI() {
             </span>
 
             <strong>
-              ₹10,150
+              {currency(actualCost)}
             </strong>
 
           </div>
@@ -842,7 +1137,7 @@ function DecisionROI() {
             </span>
 
             <strong>
-              ₹2,350
+              {currency(savings)}
             </strong>
 
           </div>
@@ -854,7 +1149,7 @@ function DecisionROI() {
             </span>
 
             <strong>
-              18.8%
+              {roiPercentage.toFixed(2)}%
             </strong>
 
           </div>
@@ -863,9 +1158,7 @@ function DecisionROI() {
 
       </div>
 
-      {/* ================================================== */}
       {/* CLOSED LOOP */}
-      {/* ================================================== */}
 
       <div className="closed-loop">
 

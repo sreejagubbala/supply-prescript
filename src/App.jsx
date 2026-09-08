@@ -24,8 +24,6 @@ function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/decision-roi" element={<DecisionROI />} />
             <Route path="/decision-history" element={<DecisionHistory />} />
-            <Route path="/feedback"element={<Feedback />}
-        />
           </Routes>
         </div>
       </div>
