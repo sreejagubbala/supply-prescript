@@ -7,6 +7,7 @@ from .routes import suppliers
 from .routes import operations
 from .routes import predictions
 from .routes import decisions
+from .routes import prescriptions
 
 
 app = FastAPI(
@@ -63,6 +64,9 @@ app.include_router(
     decisions.router
 )
 
+app.include_router(
+    prescriptions.router
+)
 
 # -------------------------
 # Root
