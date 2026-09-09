@@ -5,3 +5,4 @@ from . import operations
 from . import predictions
 from . import prescriptions
 from . import decisions
+from . import outcomes
