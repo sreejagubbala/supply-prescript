@@ -7,155 +7,97 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.routes.outcomes import router as outcomes_router
-from backend.app.routes.roi import router as roi_router
+from .routes import shipments
+from .routes import database
+from .routes import suppliers
+from .routes import operations
+from .routes import predictions
+from .routes import decisions
+from .routes import prescriptions
+from .routes import outcomes
+from .routes import roi
 
-
-# ============================================================
-# FASTAPI APPLICATION
-# ============================================================
 
 app = FastAPI(
-    title="Supply Prescript - Closed Loop Analytics",
-    description=(
-        "Closed-Loop Outcome Evaluation, ROI Analysis "
-        "and Decision Performance Analytics"
-    ),
-    version="1.0.0",
+    title="SupplyPrescript API",
+    description="Backend API for SupplyPrescript",
+    version="1.0.0"
 )
 
 
-# ============================================================
-# CORS CONFIGURATION
-# ============================================================
+# -------------------------
+# CORS
+# -------------------------
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 
-# ============================================================
-# ROOT ENDPOINT
-# ============================================================
+# -------------------------
+# Routes
+# -------------------------
+
+app.include_router(shipments.router)
+app.include_router(database.router)
+app.include_router(suppliers.router)
+app.include_router(operations.router)
+app.include_router(predictions.router)
+app.include_router(decisions.router)
+app.include_router(prescriptions.router)
+app.include_router(outcomes.router)
+app.include_router(roi.router)
+
+
+# -------------------------
+# Root
+# -------------------------
 
 @app.get("/")
 def root():
     return {
-        "project": "Supply Prescript",
-        "module": "Closed-Loop & Analytics",
-        "member": "Member 5",
-        "status": "running",
+        "message": "SupplyPrescript Backend is running"
     }
 
 
-# ============================================================
-# HEALTH CHECK
-# ============================================================
+# -------------------------
+# Health
+# -------------------------
 
 @app.get("/health")
-def health_check():
+def health():
     return {
-        "status": "healthy",
-        "module": "closed-loop-analytics",
+        "status": "healthy"
     }
 
 
-# ============================================================
-# MEMBER 5 API INFORMATION
-# ============================================================
+# -------------------------
+# API Information
+# -------------------------
 
 @app.get("/api")
 def api_information():
     return {
-        "module": "Closed-Loop & Analytics",
+        "project": "SupplyPrescript",
+        "module": "Backend + Closed-Loop Analytics",
         "endpoints": {
+            "shipments": "/shipments",
+            "database": "/database",
+            "suppliers": "/suppliers",
+            "operations": "/operations",
+            "predictions": "/predictions",
+            "decisions": "/decisions",
+            "prescriptions": "/prescriptions",
             "outcomes": "/api/outcomes",
-            "roi": "/api/roi",
-        },
-        "features": [
-            "Decision Outcome Recording",
-            "Predicted vs Actual Comparison",
-            "Decision Performance Analysis",
-            "ROI Calculation",
-            "Feedback Data Generation",
-            "Closed-Loop Evaluation",
-        ],
+            "roi": "/api/roi"
+        }
     }
-
-
-# ============================================================
-# OUTCOME ROUTES
-# ============================================================
-
-app.include_router(
-    outcomes_router,
-    prefix="/api/outcomes",
-    tags=["Outcome Evaluation"],
-)
-
-
-# ============================================================
-# ROI & ANALYTICS ROUTES
-# ============================================================
-
-app.include_router(
-    roi_router,
-    prefix="/api/roi",
-    tags=["ROI & Analytics"],
-)
-
-
-# ============================================================
-# STARTUP
-# ============================================================
-
-@app.on_event("startup")
-async def startup_event():
-
-    print("=" * 60)
-    print("SUPPLY PRESCRIPT")
-    print("MEMBER 5 - CLOSED-LOOP & ANALYTICS")
-    print("=" * 60)
-
-    print("Status   : Running")
-    print("Module   : Closed-Loop & Analytics")
-    print("Outcomes : /api/outcomes")
-    print("ROI      : /api/roi")
-    print("Docs     : http://127.0.0.1:8000/docs")
-
-    print("=" * 60)
-
-
-# ============================================================
-# SHUTDOWN
-# ============================================================
-
-@app.on_event("shutdown")
-async def shutdown_event():
-
-    print("=" * 60)
-    print("SUPPLY PRESCRIPT CLOSED-LOOP MODULE STOPPED")
-    print("=" * 60)
-
-
-# ============================================================
-# RUN DIRECTLY
-# ============================================================
-
-if __name__ == "__main__":
-
-    import uvicorn
-
-    uvicorn.run(
-        "backend.app.main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
-    )

@@ -3,101 +3,137 @@ Supply Prescript
 Member 5 - Outcome API
 """
 
-from pathlib import Path
-from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-import pandas as pd
-
-from fastapi import APIRouter, HTTPException
-
+from ..database import get_db
+from ..models.outcome import Outcome
+from ..models.decision import Decision
+from ..schemas.outcome import (
+    OutcomeCreate,
+    OutcomeResponse
+)
 
 router = APIRouter(
-    tags=["Outcomes"],
+    prefix="/api/outcomes",
+    tags=["Outcomes"]
 )
 
 
-PROJECT_ROOT = Path(
-    __file__
-).resolve().parents[3]
-
-OUTCOME_FILE = (
-    PROJECT_ROOT
-    / "data"
-    / "processed"
-    / "decision_outcomes.csv"
+@router.post(
+    "/",
+    response_model=OutcomeResponse,
+    status_code=201
 )
+def create_outcome(
+    outcome_data: OutcomeCreate,
+    db: Session = Depends(get_db)
+):
+    # Check whether the decision exists
+    decision = (
+        db.query(Decision)
+        .filter(
+            Decision.id == outcome_data.decision_id
+        )
+        .first()
+    )
 
-
-def load_outcomes() -> pd.DataFrame:
-
-    if not OUTCOME_FILE.exists():
+    if decision is None:
         raise HTTPException(
             status_code=404,
-            detail="Decision outcome file not found.",
+            detail="Decision not found"
         )
 
-    try:
-        return pd.read_csv(
-            OUTCOME_FILE
-        )
+    outcome = Outcome(
+        decision_id=outcome_data.decision_id,
+        actual_cost=outcome_data.actual_cost,
+        actual_delivery_days=outcome_data.actual_delivery_days,
+        outcome_status=outcome_data.outcome_status,
+        notes=outcome_data.notes
+    )
 
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=str(exc),
-        )
-
-
-@router.get("/")
-def get_outcomes(
-    shipment_id: Optional[str] = None,
-    action: Optional[str] = None,
-):
-
-    df = load_outcomes()
-
-    if shipment_id:
-        df = df[
-            df["Shipment_ID"]
-            .astype(str)
-            == shipment_id
-        ]
-
-    if action:
-        df = df[
-            df["Selected_Action"]
-            .astype(str)
-            .str.lower()
-            == action.lower()
-        ]
+    db.add(outcome)
+    db.commit()
+    db.refresh(outcome)
 
     return {
-        "count": len(df),
-        "data": df
-        .fillna("")
-        .to_dict(
-            orient="records"
-        ),
+        "id": outcome.id,
+        "decision_id": outcome.decision_id,
+        "actual_cost": outcome.actual_cost,
+        "actual_delivery_days": outcome.actual_delivery_days,
+        "outcome_status": outcome.outcome_status,
+        "notes": outcome.notes,
+        "created_at": (
+            outcome.created_at.isoformat()
+            if outcome.created_at
+            else None
+        )
     }
 
 
-@router.get("/{decision_id}")
-def get_outcome(
-    decision_id: str,
+@router.get(
+    "/",
+    response_model=list[OutcomeResponse]
+)
+def get_outcomes(
+    db: Session = Depends(get_db)
 ):
+    outcomes = (
+        db.query(Outcome)
+        .order_by(Outcome.id.desc())
+        .all()
+    )
 
-    df = load_outcomes()
-
-    result = df[
-        df["Decision_ID"]
-        .astype(str)
-        == decision_id
+    return [
+        {
+            "id": outcome.id,
+            "decision_id": outcome.decision_id,
+            "actual_cost": outcome.actual_cost,
+            "actual_delivery_days": outcome.actual_delivery_days,
+            "outcome_status": outcome.outcome_status,
+            "notes": outcome.notes,
+            "created_at": (
+                outcome.created_at.isoformat()
+                if outcome.created_at
+                else None
+            )
+        }
+        for outcome in outcomes
     ]
 
-    if result.empty:
+
+@router.get(
+    "/{outcome_id}",
+    response_model=OutcomeResponse
+)
+def get_outcome(
+    outcome_id: int,
+    db: Session = Depends(get_db)
+):
+    outcome = (
+        db.query(Outcome)
+        .filter(
+            Outcome.id == outcome_id
+        )
+        .first()
+    )
+
+    if outcome is None:
         raise HTTPException(
             status_code=404,
-            detail="Decision not found.",
+            detail="Outcome not found"
         )
 
-    return result.iloc[0].fillna("").to_dict()
+    return {
+        "id": outcome.id,
+        "decision_id": outcome.decision_id,
+        "actual_cost": outcome.actual_cost,
+        "actual_delivery_days": outcome.actual_delivery_days,
+        "outcome_status": outcome.outcome_status,
+        "notes": outcome.notes,
+        "created_at": (
+            outcome.created_at.isoformat()
+            if outcome.created_at
+            else None
+        )
+    }
