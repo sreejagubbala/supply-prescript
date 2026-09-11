@@ -1,55 +1,269 @@
+"""
+Supply Prescript
+Member 5 - ROI Calculation
 
-from performance_metrics import calculate_cost_savings
+Generates:
 
-def calculate_savings(expected_cost, actual_cost):
-    """
-    Calculate savings from a decision.
+data/processed/roi_summary.csv
+data/processed/action_roi_summary.csv
+"""
 
-    Formula:
-        Expected Cost - Actual Cost
-    """
-    return calculate_cost_savings(expected_cost, actual_cost)
+from pathlib import Path
 
-
-def calculate_roi(expected_cost, actual_cost):
-    """
-    Calculate ROI percentage.
-
-    Formula:
-        ROI = (Savings / Expected Cost) * 100
-    """
-    if expected_cost < 0:
-        raise ValueError("Expected cost cannot be negative")
-
-    if actual_cost < 0:
-        raise ValueError("Actual cost cannot be negative")
-
-    if expected_cost == 0:
-        return 0.0
-
-    savings = expected_cost - actual_cost
-
-    return (savings / expected_cost) * 100
+import pandas as pd
 
 
-def calculate_roi_details(expected_cost, actual_cost):
-    """
-    Return complete ROI information.
-    """
-    savings = calculate_savings(expected_cost, actual_cost)
-    roi = calculate_roi(expected_cost, actual_cost)
-    return {
-        "expected_cost": expected_cost,
-        "actual_cost": actual_cost,
-        "savings": savings,
-        "roi_percentage": roi
+# ============================================================
+# PATHS
+# ============================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+INPUT_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "processed"
+    / "decision_outcomes.csv"
+)
+
+OUTPUT_DIR = (
+    PROJECT_ROOT
+    / "data"
+    / "processed"
+)
+
+ROI_SUMMARY_FILE = (
+    OUTPUT_DIR
+    / "roi_summary.csv"
+)
+
+ACTION_ROI_FILE = (
+    OUTPUT_DIR
+    / "action_roi_summary.csv"
+)
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+def load_outcomes() -> pd.DataFrame:
+
+    if not INPUT_FILE.exists():
+        raise FileNotFoundError(
+            f"Missing file: {INPUT_FILE}"
+        )
+
+    df = pd.read_csv(INPUT_FILE)
+
+    if df.empty:
+        raise ValueError(
+            "decision_outcomes.csv is empty."
+        )
+
+    return df
+
+
+# ============================================================
+# OVERALL ROI
+# ============================================================
+
+def calculate_overall_roi(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+
+    expected = df["Expected_Cost"].sum()
+    actual = df["Actual_Cost"].sum()
+
+    savings = expected - actual
+
+    if expected != 0:
+        roi = savings / expected * 100
+    else:
+        roi = 0
+
+    success_rate = (
+        df["Action_Success"]
+        .astype(bool)
+        .mean()
+        * 100
+    )
+
+    on_time_rate = (
+        df["On_Time"]
+        .astype(bool)
+        .mean()
+        * 100
+    )
+
+    result = {
+        "total_decisions": len(df),
+
+        "expected_cost": round(
+            expected,
+            2,
+        ),
+
+        "actual_cost": round(
+            actual,
+            2,
+        ),
+
+        "savings": round(
+            savings,
+            2,
+        ),
+
+        "roi_percentage": round(
+            roi,
+            2,
+        ),
+
+        "success_rate": round(
+            success_rate,
+            2,
+        ),
+
+        "on_time_rate": round(
+            on_time_rate,
+            2,
+        ),
     }
 
+    return pd.DataFrame([result])
 
-def calculate_average_roi(roi_values):
-    """
-    Calculate average ROI from multiple decisions.
-    """
-    if not roi_values:
-        return 0.0
-    return sum(roi_values) / len(roi_values)
+
+# ============================================================
+# ROI BY ACTION
+# ============================================================
+
+def calculate_action_roi(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+
+    result = (
+        df.groupby("Selected_Action")
+        .agg(
+            decisions=(
+                "Decision_ID",
+                "count",
+            ),
+
+            expected_cost=(
+                "Expected_Cost",
+                "sum",
+            ),
+
+            actual_cost=(
+                "Actual_Cost",
+                "sum",
+            ),
+
+            savings=(
+                "Cost_Saving",
+                "sum",
+            ),
+
+            average_cost_variance=(
+                "Cost_Variance",
+                "mean",
+            ),
+
+            average_delay_variance=(
+                "Delay_Variance_Days",
+                "mean",
+            ),
+
+            success_rate=(
+                "Action_Success",
+                "mean",
+            ),
+
+            on_time_rate=(
+                "On_Time",
+                "mean",
+            ),
+        )
+        .reset_index()
+    )
+
+    result["roi_percentage"] = (
+        result["savings"]
+        / result["expected_cost"]
+        .replace(0, pd.NA)
+        * 100
+    )
+
+    result["success_rate"] *= 100
+    result["on_time_rate"] *= 100
+
+    return result.round(2)
+
+
+# ============================================================
+# SAVE
+# ============================================================
+
+def save_roi_reports(
+    df: pd.DataFrame,
+) -> None:
+
+    OUTPUT_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    overall = calculate_overall_roi(df)
+
+    by_action = calculate_action_roi(df)
+
+    overall.to_csv(
+        ROI_SUMMARY_FILE,
+        index=False,
+    )
+
+    by_action.to_csv(
+        ACTION_ROI_FILE,
+        index=False,
+    )
+
+    print(
+        f"Saved: {ROI_SUMMARY_FILE}"
+    )
+
+    print(
+        f"Saved: {ACTION_ROI_FILE}"
+    )
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main() -> None:
+
+    print("=" * 60)
+    print("SUPPLY PRESCRIPT - ROI CALCULATION")
+    print("=" * 60)
+
+    df = load_outcomes()
+
+    save_roi_reports(df)
+
+    print("\nOverall ROI:")
+    print(
+        calculate_overall_roi(df).to_string(
+            index=False
+        )
+    )
+
+    print("\nROI by Action:")
+    print(
+        calculate_action_roi(df).to_string(
+            index=False
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
