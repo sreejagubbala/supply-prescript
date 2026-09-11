@@ -1,13 +1,21 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 
-class PredictionResponse(BaseModel):
-
+class PredictionBase(BaseModel):
     shipment_id: int
+    delay_probability: float
+    predicted_delay_days: float
+    model_name: Optional[str] = "XGBoost"
 
-    riskScore: float
 
-    prediction: str
+class PredictionCreate(PredictionBase):
+    pass
 
-    confidence: Optional[float] = None
+
+class PredictionResponse(PredictionBase):
+    id: int
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
