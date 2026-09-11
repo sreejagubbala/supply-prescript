@@ -44,6 +44,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
+app = FastAPI(
+    title="SupplyPrescript API",
+    description="Backend API for SupplyPrescript",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,15 +58,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
-
-app = FastAPI(
-    title="SupplyPrescript API",
-    description="Backend API for SupplyPrescript",
-    version="1.0.0",
-    lifespan=lifespan
-)
-
 
 app.include_router(
     shipments.router
