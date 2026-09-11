@@ -22,6 +22,7 @@ from .models import (
     Outcome
 )
 
+from scripts.seed_database import seed_database
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,10 +30,12 @@ async def lifespan(app: FastAPI):
     print("Creating database tables...")
 
     Base.metadata.create_all(
-        bind=engine
+    bind=engine
     )
-
-    print("Database tables ready.")
+    
+    seed_database()
+    
+    print("Database tables and sample data ready.")
 
     yield
 
