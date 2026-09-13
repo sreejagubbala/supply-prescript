@@ -27,7 +27,7 @@ def get_operations_summary(
     on_time_count = (
         db.query(Shipment)
         .filter(
-            func.lower(Shipment.status) == "on time"
+            func.lower(Shipment.status) == "on track"
         )
         .count()
     )
@@ -36,7 +36,7 @@ def get_operations_summary(
     delayed_count = (
         db.query(Shipment)
         .filter(
-            func.lower(Shipment.status) == "delayed"
+            func.lower(Shipment.status) == "at risk"
         )
         .count()
     )
