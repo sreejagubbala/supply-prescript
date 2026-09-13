@@ -90,11 +90,13 @@ app.include_router(
 )
 
 app.include_router(
-    outcomes.router
+    outcomes.router,
+    prefix="/api/outcomes"
 )
 
 app.include_router(
-    roi.router
+    roi.router,
+    prefix="/api/roi"
 )
 
 
