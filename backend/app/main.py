@@ -61,38 +61,14 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-app.include_router(
-    shipments.router
-)
-
-app.include_router(
-    database.router
-)
-
-app.include_router(
-    suppliers.router
-)
-
-app.include_router(
-    operations.router
-)
-
-app.include_router(
-    predictions.router
-)
-
-app.include_router(
-    prescriptions.router
-)
-
-app.include_router(
-    decisions.router
-)
-
-app.include_router(
-    outcomes.router,
-    prefix="/api/outcomes"
-)
+app.include_router(shipments.router)
+app.include_router(database.router)
+app.include_router(suppliers.router)
+app.include_router(operations.router)
+app.include_router(predictions.router)
+app.include_router(prescriptions.router)
+app.include_router(decisions.router)
+app.include_router(outcomes.router)
 
 app.include_router(
     roi.router,
