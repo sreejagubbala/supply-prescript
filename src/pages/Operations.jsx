@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Search, X, ArrowUp, ArrowDown, Download } from 'lucide-react'
 import { fetchShipments } from '../api/shipments'
-import { useNavigate } from 'react-router-dom'
 
 const mockShipments = [
   { id: 'SHP-001', origin: 'Chennai', destination: 'Bengaluru', status: 'On-Time', eta: '2026-08-28', riskScore: 12 },
@@ -32,36 +31,40 @@ const HIGH_RISK_THRESHOLD = 70
 const cityColors = {}
 const palette = ['bg-blue-400', 'bg-pink-400', 'bg-teal-400', 'bg-orange-400', 'bg-indigo-400', 'bg-yellow-400']
 function getCityColor(city) {
-  if (!cityColors[city]) {
+  const key = String(city)
+  if (!cityColors[key]) {
     const usedCount = Object.keys(cityColors).length
-    cityColors[city] = palette[usedCount % palette.length]
+    cityColors[key] = palette[usedCount % palette.length]
   }
-  return cityColors[city]
+  return cityColors[key]
 }
 
 function riskColor(score) {
-  if (score >= HIGH_RISK_THRESHOLD) return 'text-red-400'
-  if (score >= 40) return 'text-yellow-400'
+  const numScore = Number(score) || 0
+  if (numScore >= HIGH_RISK_THRESHOLD) return 'text-red-400'
+  if (numScore >= 40) return 'text-yellow-400'
   return 'text-green-400'
 }
 
 function StatusBadge({ status }) {
+  const label = String(status ?? 'Unknown')
   return (
     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-      status === 'Delayed'
+      label === 'Delayed'
         ? 'bg-red-500/20 text-red-400'
         : 'bg-green-500/20 text-green-400'
     }`}>
-      {status}
+      {label}
     </span>
   )
 }
 
 function CityTag({ city }) {
+  const label = String(city ?? 'Unknown')
   return (
     <span className="flex items-center gap-1.5">
-      <span className={`w-2 h-2 rounded-full ${getCityColor(city)}`}></span>
-      {city}
+      <span className={`w-2 h-2 rounded-full ${getCityColor(label)}`}></span>
+      {label}
     </span>
   )
 }
@@ -91,7 +94,6 @@ function normalizeShipment(raw) {
 }
 
 function Shipments() {
-  const navigate = useNavigate()
   const [shipments, setShipments] = useState([])
   const [statusFilter, setStatusFilter] = useState('All')
   const [search, setSearch] = useState('')
@@ -102,7 +104,7 @@ function Shipments() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-      useEffect(() => {
+  useEffect(() => {
     fetchShipments()
       .then((data) => {
         const list = Array.isArray(data) ? data : data.shipments || []
@@ -114,7 +116,7 @@ function Shipments() {
       })
   }, [])
 
-    const filtered = shipments.filter((s) => {
+  const filtered = shipments.filter((s) => {
     const matchesStatus = statusFilter === 'All' || s.status === statusFilter
     const matchesSearch =
       String(s.id).toLowerCase().includes(search.toLowerCase()) ||
@@ -373,10 +375,6 @@ function Shipments() {
               </p>
               <p><span className="text-gray-400">ETA:</span> {selected.eta}</p>
               <p><span className="text-gray-400">Delay Risk Score:</span> <span className={riskColor(selected.riskScore)}>{selected.riskScore}%</span></p>
-              <button
-                     onClick={() => navigate(`/shipments/${selected.id}`)}
-                    className="mt-4 w-full bg-purple-600 hover:bg-purple-700 transition rounded-lg py-2 text-sm font-semibold"> View Full Disruption Details
-              </button>
             </div>
           </div>
         </div>
