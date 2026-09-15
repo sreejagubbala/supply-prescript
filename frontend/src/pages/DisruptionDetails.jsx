@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { fetchShipments } from '../api/shipments'
+import { fetchShipments, fetchDelayPrediction } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -86,20 +86,40 @@ function DisruptionDetails() {
   const [shipment, setShipment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionMessage, setActionMessage] = useState('')
+  const [prediction, setPrediction] = useState(null)
 
   useEffect(() => {
-    fetchShipments()
-      .then((data) => {
-        const list = Array.isArray(data) ? data : data.shipments || []
-        const found = list.find((s) => String(s.id) === String(shipmentId))
-        setShipment(found || null)
-        setLoading(false)
+  fetchShipments()
+    .then((data) => {
+      const list = Array.isArray(data) ? data : data.shipments || []
+      const found = list.find((s) => String(s.id) === String(shipmentId))
+      setShipment(found || null)
+      setLoading(false)
+    })
+    .catch(() => {
+      setShipment(null)
+      setLoading(false)
+    })
+}, [shipmentId])
+
+useEffect(() => {
+  if (!shipment) return
+
+  fetchDelayPrediction(shipment.id)
+    .then((data) => {
+      setPrediction({
+        probability: data.probability ?? data.delayProbability ?? 0,
+        confidence: data.confidence ?? 'Medium',
       })
-      .catch(() => {
-        setShipment(null)
-        setLoading(false)
+    })
+    .catch(() => {
+      const mockProbability = Math.min(95, Math.round((shipment.riskScore || 0) * 0.9 + 5))
+      setPrediction({
+        probability: mockProbability,
+        confidence: 'Estimated (mock)',
       })
-  }, [shipmentId])
+    })
+}, [shipment])
 
   function handleContactSupplier() {
     setActionMessage('Supplier has been notified via email.')
@@ -215,9 +235,34 @@ function DisruptionDetails() {
         )}
       </div>
 
-      <div className="bg-gray-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold mb-2">Delay Probability</h3>
-        <p className="text-gray-500 text-sm">Coming Day 9 — ML prediction integration</p>
+            <div className="bg-gray-800 rounded-xl p-6">
+        <h3 className="text-lg font-semibold mb-4">Delay Probability</h3>
+        {prediction ? (
+          <div className="flex items-center gap-6">
+            <div className="relative w-24 h-24">
+              <svg className="w-24 h-24 -rotate-90">
+                <circle cx="48" cy="48" r="40" stroke="#374151" strokeWidth="8" fill="none" />
+                <circle
+                  cx="48" cy="48" r="40"
+                  stroke={prediction.probability >= 70 ? '#f87171' : prediction.probability >= 40 ? '#facc15' : '#4ade80'}
+                  strokeWidth="8"
+                  fill="none"
+                  strokeDasharray={`${(prediction.probability / 100) * 251.2} 251.2`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center text-lg font-bold">
+                {prediction.probability}%
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Predicted delay probability</p>
+              <p className="text-xs text-gray-500 mt-1">Confidence: {prediction.confidence}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm">Loading prediction...</p>
+        )}
       </div>
 
       <div className="bg-gray-800 rounded-xl p-6">
