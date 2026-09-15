@@ -29,3 +29,18 @@ export async function fetchOperationsSummary() {
   }
   return response.json()
 }
+
+export async function fetchDelayPrediction(shipmentId) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 1500)
+
+  const response = await fetch(`${API_BASE_URL}/predictions/${shipmentId}`, {
+    signal: controller.signal,
+  })
+  clearTimeout(timeout)
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch delay prediction')
+  }
+  return response.json()
+}

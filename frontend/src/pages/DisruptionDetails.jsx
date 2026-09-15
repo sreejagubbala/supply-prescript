@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2 } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { fetchShipments } from '../api/shipments'
+import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { fetchShipments, fetchDelayPrediction } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -80,12 +80,61 @@ function RouteVisual({ origin, destination }) {
   )
 }
 
+function generateMockTrend(currentValue) {
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Today']
+  const values = []
+  let v = Math.max(5, currentValue - Math.floor(Math.random() * 20) - 5)
+  for (let i = 0; i < 6; i++) {
+    v = Math.min(95, Math.max(5, v + (Math.random() * 16 - 8)))
+    values.push(Math.round(v))
+  }
+  values.push(Math.round(currentValue))
+  return days.map((day, i) => ({ day, value: values[i] }))
+}
+
+function getMockFactors(shipment, probability) {
+  const factors = []
+  if (probability >= 60) {
+    factors.push('Historical delays on this route above average')
+  }
+  if (shipment.origin && shipment.destination) {
+    factors.push(`Distance and typical transit congestion between ${shipment.origin} and ${shipment.destination}`)
+  }
+  factors.push('Current season / weather-related shipping patterns')
+  if (probability < 40) {
+    factors.push('Carrier has a strong on-time performance history')
+  }
+  return factors.slice(0, 3)
+}
+
+function TrendMiniChart({ data }) {
+  const max = Math.max(...data.map((d) => d.value), 10)
+  return (
+    <div className="flex items-end gap-2 h-16">
+      {data.map((d) => (
+        <div key={d.day} className="flex flex-col items-center gap-1 flex-1">
+          <div
+            className="w-full bg-purple-500/70 rounded-t"
+            style={{ height: `${(d.value / max) * 48}px` }}
+            title={`${d.day}: ${d.value}%`}
+          />
+          <span className="text-[10px] text-gray-500">{d.day}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function DisruptionDetails() {
   const { shipmentId } = useParams()
   const navigate = useNavigate()
   const [shipment, setShipment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionMessage, setActionMessage] = useState('')
+  const [prediction, setPrediction] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [secondsAgo, setSecondsAgo] = useState(0)
+  const trendRef = useRef(null)
 
   useEffect(() => {
     fetchShipments()
@@ -100,6 +149,52 @@ function DisruptionDetails() {
         setLoading(false)
       })
   }, [shipmentId])
+
+  function loadPrediction() {
+    if (!shipment) return
+
+    fetchDelayPrediction(shipment.id)
+      .then((data) => {
+        const probability = data.probability ?? data.delayProbability ?? 0
+        setPrediction({
+          probability,
+          confidence: data.confidence ?? 'Medium',
+          isMock: false,
+        })
+        if (!trendRef.current) {
+          trendRef.current = data.trend ?? generateMockTrend(probability)
+        }
+        setLastUpdated(Date.now())
+      })
+      .catch(() => {
+        const mockProbability = Math.min(95, Math.round((shipment.riskScore || 0) * 0.9 + 5))
+        setPrediction({
+          probability: mockProbability,
+          confidence: 'Estimated',
+          isMock: true,
+        })
+        if (!trendRef.current) {
+          trendRef.current = generateMockTrend(mockProbability)
+        }
+        setLastUpdated(Date.now())
+      })
+  }
+
+  useEffect(() => {
+    if (!shipment) return
+    loadPrediction()
+    const interval = setInterval(loadPrediction, 45000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shipment])
+
+  useEffect(() => {
+    if (!lastUpdated) return
+    const tick = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastUpdated) / 1000))
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [lastUpdated])
 
   function handleContactSupplier() {
     setActionMessage('Supplier has been notified via email.')
@@ -130,6 +225,8 @@ function DisruptionDetails() {
   }
 
   const severity = getRiskSeverity(shipment.riskScore)
+  const factors = prediction ? getMockFactors(shipment, prediction.probability) : []
+  const trendData = trendRef.current || []
 
   return (
     <div className="p-6 text-white space-y-6">
@@ -215,9 +312,77 @@ function DisruptionDetails() {
         )}
       </div>
 
+      {/* Delay Probability */}
       <div className="bg-gray-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold mb-2">Delay Probability</h3>
-        <p className="text-gray-500 text-sm">Coming Day 9 — ML prediction integration</p>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h3 className="text-lg font-semibold">Delay Probability</h3>
+          <div className="flex items-center gap-3">
+            {prediction && (
+              <span
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full ${
+                  prediction.isMock
+                    ? 'bg-yellow-500/20 text-yellow-400'
+                    : 'bg-green-500/20 text-green-400'
+                }`}
+              >
+                {prediction.isMock ? <HelpCircle size={12} /> : <CheckCircle size={12} />}
+                {prediction.isMock ? 'Estimated data' : 'Live ML data'}
+              </span>
+            )}
+            {lastUpdated && (
+              <span className="flex items-center gap-1 text-xs text-gray-500">
+                <RefreshCw size={12} />
+                Updated {secondsAgo}s ago
+              </span>
+            )}
+          </div>
+        </div>
+
+        {prediction ? (
+          <>
+            <div className="flex items-center gap-6 mb-6">
+              <div className="relative w-24 h-24 flex-shrink-0">
+                <svg className="w-24 h-24 -rotate-90">
+                  <circle cx="48" cy="48" r="40" stroke="#374151" strokeWidth="8" fill="none" />
+                  <circle
+                    cx="48" cy="48" r="40"
+                    stroke={prediction.probability >= 70 ? '#f87171' : prediction.probability >= 40 ? '#facc15' : '#4ade80'}
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${(prediction.probability / 100) * 251.2} 251.2`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-lg font-bold">
+                  {prediction.probability}%
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Predicted delay probability</p>
+                <p className="text-xs text-gray-500 mt-1">Confidence: {prediction.confidence}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-xs text-gray-400 mb-2">7-day trend</p>
+              <TrendMiniChart data={trendData} />
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-400 mb-2">Contributing factors</p>
+              <ul className="space-y-1.5">
+                {factors.map((f) => (
+                  <li key={f} className="text-sm text-gray-300 flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">•</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        ) : (
+          <p className="text-gray-500 text-sm">Loading prediction...</p>
+        )}
       </div>
 
       <div className="bg-gray-800 rounded-xl p-6">
