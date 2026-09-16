@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { fetchShipments, fetchDelayPrediction } from '../api/shipments'
+import { fetchPrescriptions } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -134,6 +135,7 @@ function DisruptionDetails() {
   const [prediction, setPrediction] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [secondsAgo, setSecondsAgo] = useState(0)
+  const [prescriptions, setPrescriptions] = useState([])
   const trendRef = useRef(null)
 
   useEffect(() => {
@@ -195,6 +197,18 @@ function DisruptionDetails() {
     }, 1000)
     return () => clearInterval(tick)
   }, [lastUpdated])
+
+  useEffect(() => {
+  if (!shipment) return
+
+  fetchPrescriptions(shipment.id)
+    .then((data) => {
+      setPrescriptions(Array.isArray(data) ? data : [])
+    })
+    .catch(() => {
+      setPrescriptions([])
+    })
+  }, [shipment])
 
   function handleContactSupplier() {
     setActionMessage('Supplier has been notified via email.')
@@ -386,9 +400,50 @@ function DisruptionDetails() {
       </div>
 
       <div className="bg-gray-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold mb-2">Prescription Recommendations</h3>
-        <p className="text-gray-500 text-sm">Coming Day 10-11 — optimization engine results</p>
-      </div>
+  <h3 className="text-lg font-semibold mb-4">Prescription Recommendations</h3>
+  {prescriptions.length === 0 ? (
+    <p className="text-gray-500 text-sm">No recommendations available for this shipment.</p>
+  ) : (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {prescriptions
+        .sort((a, b) => a.recommendation_rank - b.recommendation_rank)
+        .map((p) => (
+          <div
+            key={p.id}
+            className={`rounded-xl p-4 border ${
+              p.recommendation_rank === 1
+                ? 'border-purple-500 bg-purple-500/10'
+                : 'border-gray-700 bg-gray-900/50'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold">{p.option_name}</h4>
+              {p.recommendation_rank === 1 && (
+                <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                  Best Option
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-400 mb-4">{p.description}</p>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Estimated Cost</span>
+                <span className="font-semibold">₹{p.estimated_cost.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Delivery Time</span>
+                <span className="font-semibold">{p.delivery_days} days</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Risk Score</span>
+                <span className="font-semibold">{p.risk_score}%</span>
+              </div>
+            </div>
+          </div>
+        ))}
+    </div>
+  )}
+</div>
     </div>
   )
 }
