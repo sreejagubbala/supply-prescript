@@ -1,8 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle } from 'lucide-react'
+import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle, Info } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { fetchShipments, fetchDelayPrediction } from '../api/shipments'
-import { fetchPrescriptions } from '../api/shipments'
+import { fetchShipments, fetchDelayPrediction, fetchPrescriptions } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -10,6 +9,25 @@ function getRiskSeverity(score) {
   if (s >= 60) return { label: 'High', color: 'bg-orange-500/20 text-orange-400 border-orange-500' }
   if (s >= 30) return { label: 'Medium', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500' }
   return { label: 'Low', color: 'bg-green-500/20 text-green-400 border-green-500' }
+}
+
+// Same severity scale, but returns a compact badge style for use inside
+// small prescription cards rather than the larger header badge above.
+function getPrescriptionRiskBadge(score) {
+  const s = Number(score) || 0
+  if (s >= 60) return { label: 'High', dot: 'bg-red-400', text: 'text-red-400' }
+  if (s >= 30) return { label: 'Medium', dot: 'bg-yellow-400', text: 'text-yellow-400' }
+  return { label: 'Low', dot: 'bg-green-400', text: 'text-green-400' }
+}
+
+function getRankExplanation(rank, prescriptions) {
+  if (prescriptions.length === 0) return ''
+  if (rank === 1) {
+    return 'Best overall balance of cost, delivery speed, and risk among the available options.'
+  }
+  const best = prescriptions.find((p) => p.recommendation_rank === 1)
+  if (!best) return ''
+  return 'Ranked lower due to higher cost, longer delivery time, or greater risk compared to the top option.'
 }
 
 function getTimelineStage(status) {
@@ -126,6 +144,17 @@ function TrendMiniChart({ data }) {
   )
 }
 
+// Small horizontal comparison bar used to show how one option's value
+// (cost, delivery time, or risk) compares to the max across all options.
+function ComparisonBar({ value, max, colorClass }) {
+  const pct = max > 0 ? Math.max(4, (value / max) * 100) : 4
+  return (
+    <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+      <div className={`h-full ${colorClass}`} style={{ width: `${pct}%` }} />
+    </div>
+  )
+}
+
 function DisruptionDetails() {
   const { shipmentId } = useParams()
   const navigate = useNavigate()
@@ -136,6 +165,7 @@ function DisruptionDetails() {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [secondsAgo, setSecondsAgo] = useState(0)
   const [prescriptions, setPrescriptions] = useState([])
+  const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null)
   const trendRef = useRef(null)
 
   useEffect(() => {
@@ -199,15 +229,15 @@ function DisruptionDetails() {
   }, [lastUpdated])
 
   useEffect(() => {
-  if (!shipment) return
-
-  fetchPrescriptions(shipment.id)
-    .then((data) => {
-      setPrescriptions(Array.isArray(data) ? data : [])
-    })
-    .catch(() => {
-      setPrescriptions([])
-    })
+    if (!shipment) return
+    fetchPrescriptions(shipment.id)
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
+        setPrescriptions(list)
+        const top = list.find((p) => p.recommendation_rank === 1)
+        if (top) setSelectedPrescriptionId(top.id)
+      })
+      .catch(() => setPrescriptions([]))
   }, [shipment])
 
   function handleContactSupplier() {
@@ -241,6 +271,13 @@ function DisruptionDetails() {
   const severity = getRiskSeverity(shipment.riskScore)
   const factors = prediction ? getMockFactors(shipment, prediction.probability) : []
   const trendData = trendRef.current || []
+
+  const sortedPrescriptions = [...prescriptions].sort(
+    (a, b) => a.recommendation_rank - b.recommendation_rank
+  )
+  const maxCost = Math.max(...prescriptions.map((p) => p.estimated_cost), 1)
+  const maxDays = Math.max(...prescriptions.map((p) => p.delivery_days), 1)
+  const maxRisk = Math.max(...prescriptions.map((p) => p.risk_score), 1)
 
   return (
     <div className="p-6 text-white space-y-6">
@@ -399,51 +436,76 @@ function DisruptionDetails() {
         )}
       </div>
 
+      {/* Prescription Recommendations */}
       <div className="bg-gray-800 rounded-xl p-6">
-  <h3 className="text-lg font-semibold mb-4">Prescription Recommendations</h3>
-  {prescriptions.length === 0 ? (
-    <p className="text-gray-500 text-sm">No recommendations available for this shipment.</p>
-  ) : (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {prescriptions
-        .sort((a, b) => a.recommendation_rank - b.recommendation_rank)
-        .map((p) => (
-          <div
-            key={p.id}
-            className={`rounded-xl p-4 border ${
-              p.recommendation_rank === 1
-                ? 'border-purple-500 bg-purple-500/10'
-                : 'border-gray-700 bg-gray-900/50'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-semibold">{p.option_name}</h4>
-              {p.recommendation_rank === 1 && (
-                <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">
-                  Best Option
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-gray-400 mb-4">{p.description}</p>
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Estimated Cost</span>
-                <span className="font-semibold">₹{p.estimated_cost.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Delivery Time</span>
-                <span className="font-semibold">{p.delivery_days} days</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Risk Score</span>
-                <span className="font-semibold">{p.risk_score}%</span>
-              </div>
-            </div>
+        <h3 className="text-lg font-semibold mb-4">Prescription Recommendations</h3>
+        {sortedPrescriptions.length === 0 ? (
+          <p className="text-gray-500 text-sm">No recommendations available for this shipment.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {sortedPrescriptions.map((p) => {
+              const isSelected = selectedPrescriptionId === p.id
+              const riskBadge = getPrescriptionRiskBadge(p.risk_score)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPrescriptionId(p.id)}
+                  className={`text-left rounded-xl p-4 border transition ${
+                    isSelected
+                      ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/50'
+                      : 'border-gray-700 bg-gray-900/50 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold">{p.option_name}</h4>
+                    <div className="flex items-center gap-1.5">
+                      {p.recommendation_rank === 1 && (
+                        <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                          Best Option
+                        </span>
+                      )}
+                      {isSelected && <CheckCircle size={16} className="text-purple-400" />}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-4">{p.description}</p>
+
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-gray-500">Estimated Cost</span>
+                        <span className="font-semibold">₹{p.estimated_cost.toLocaleString()}</span>
+                      </div>
+                      <ComparisonBar value={p.estimated_cost} max={maxCost} colorClass="bg-blue-400" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-gray-500">Delivery Time</span>
+                        <span className="font-semibold">{p.delivery_days} days</span>
+                      </div>
+                      <ComparisonBar value={p.delivery_days} max={maxDays} colorClass="bg-pink-400" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1 items-center">
+                        <span className="text-gray-500">Risk Score</span>
+                        <span className={`font-semibold flex items-center gap-1.5 ${riskBadge.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${riskBadge.dot}`}></span>
+                          {p.risk_score}% ({riskBadge.label})
+                        </span>
+                      </div>
+                      <ComparisonBar value={p.risk_score} max={maxRisk} colorClass="bg-orange-400" />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-gray-700 flex items-start gap-1.5 text-xs text-gray-500">
+                    <Info size={12} className="mt-0.5 flex-shrink-0" />
+                    {getRankExplanation(p.recommendation_rank, sortedPrescriptions)}
+                  </div>
+                </button>
+              )
+            })}
           </div>
-        ))}
-    </div>
-  )}
-</div>
+        )}
+      </div>
     </div>
   )
 }
