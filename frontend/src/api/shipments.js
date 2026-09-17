@@ -44,3 +44,18 @@ export async function fetchDelayPrediction(shipmentId) {
   }
   return response.json()
 }
+
+export async function fetchPrescriptions(shipmentId) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 1500)
+
+  const response = await fetch(`${API_BASE_URL}/prescriptions/shipment/${shipmentId}`, {
+    signal: controller.signal,
+  })
+  clearTimeout(timeout)
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch prescriptions')
+  }
+  return response.json()
+}

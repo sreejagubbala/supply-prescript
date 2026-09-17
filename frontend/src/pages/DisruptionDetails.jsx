@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle } from 'lucide-react'
+import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle, Info, Download } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { fetchShipments, fetchDelayPrediction } from '../api/shipments'
+import { fetchShipments, fetchDelayPrediction, fetchPrescriptions } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -9,6 +9,20 @@ function getRiskSeverity(score) {
   if (s >= 60) return { label: 'High', color: 'bg-orange-500/20 text-orange-400 border-orange-500' }
   if (s >= 30) return { label: 'Medium', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500' }
   return { label: 'Low', color: 'bg-green-500/20 text-green-400 border-green-500' }
+}
+
+function getPrescriptionRiskBadge(score) {
+  const s = Number(score) || 0
+  if (s >= 60) return { label: 'High', dot: 'bg-red-400', text: 'text-red-400' }
+  if (s >= 30) return { label: 'Medium', dot: 'bg-yellow-400', text: 'text-yellow-400' }
+  return { label: 'Low', dot: 'bg-green-400', text: 'text-green-400' }
+}
+
+function getRankExplanation(rank) {
+  if (rank === 1) {
+    return 'Best overall balance of cost, delivery speed, and risk among the available options.'
+  }
+  return 'Ranked lower due to higher cost, longer delivery time, or greater risk compared to the top option.'
 }
 
 function getTimelineStage(status) {
@@ -125,6 +139,73 @@ function TrendMiniChart({ data }) {
   )
 }
 
+function ComparisonBar({ value, max, colorClass }) {
+  const pct = max > 0 ? Math.max(4, (value / max) * 100) : 4
+  return (
+    <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+      <div className={`h-full ${colorClass}`} style={{ width: `${pct}%` }} />
+    </div>
+  )
+}
+
+// Combines cost, delivery time, and risk into one 0-100 "value score" where
+// higher is better. Cheaper, faster, and lower-risk options score higher.
+// This is a simple normalized-and-averaged heuristic, not a model output.
+function computeValueScore(p, maxCost, maxDays, maxRisk) {
+  const costScore = maxCost > 0 ? (1 - p.estimated_cost / maxCost) * 100 : 0
+  const speedScore = maxDays > 0 ? (1 - p.delivery_days / maxDays) * 100 : 0
+  const riskScore = maxRisk > 0 ? (1 - p.risk_score / maxRisk) * 100 : 0
+  return Math.round((costScore + speedScore + riskScore) / 3)
+}
+
+function exportComparisonCSV(prescriptions) {
+  const headers = ['Option', 'Cost', 'Delivery Days', 'Risk Score', 'Rank', 'Value Score']
+  const rows = prescriptions.map((p) => [
+    p.option_name,
+    p.estimated_cost,
+    p.delivery_days,
+    p.risk_score,
+    p.recommendation_rank,
+    p.valueScore,
+  ])
+  const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'prescription-comparison.csv'
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function MiniComparisonChart({ prescriptions, maxCost, maxDays, maxRisk }) {
+  const rows = [
+    { key: 'estimated_cost', label: 'Cost', max: maxCost, color: 'bg-blue-400' },
+    { key: 'delivery_days', label: 'Delivery', max: maxDays, color: 'bg-pink-400' },
+    { key: 'risk_score', label: 'Risk', max: maxRisk, color: 'bg-orange-400' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {rows.map((row) => (
+        <div key={row.key}>
+          <p className="text-xs text-gray-400 mb-2">{row.label}</p>
+          <div className="space-y-1.5">
+            {prescriptions.map((p) => (
+              <div key={p.id} className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 w-28 truncate">{p.option_name}</span>
+                <div className="flex-1">
+                  <ComparisonBar value={p[row.key]} max={row.max} colorClass={row.color} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function DisruptionDetails() {
   const { shipmentId } = useParams()
   const navigate = useNavigate()
@@ -134,6 +215,8 @@ function DisruptionDetails() {
   const [prediction, setPrediction] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [secondsAgo, setSecondsAgo] = useState(0)
+  const [prescriptions, setPrescriptions] = useState([])
+  const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null)
   const trendRef = useRef(null)
 
   useEffect(() => {
@@ -196,6 +279,18 @@ function DisruptionDetails() {
     return () => clearInterval(tick)
   }, [lastUpdated])
 
+  useEffect(() => {
+    if (!shipment) return
+    fetchPrescriptions(shipment.id)
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
+        setPrescriptions(list)
+        const top = list.find((p) => p.recommendation_rank === 1)
+        if (top) setSelectedPrescriptionId(top.id)
+      })
+      .catch(() => setPrescriptions([]))
+  }, [shipment])
+
   function handleContactSupplier() {
     setActionMessage('Supplier has been notified via email.')
     setTimeout(() => setActionMessage(''), 3000)
@@ -227,6 +322,20 @@ function DisruptionDetails() {
   const severity = getRiskSeverity(shipment.riskScore)
   const factors = prediction ? getMockFactors(shipment, prediction.probability) : []
   const trendData = trendRef.current || []
+
+  const sortedPrescriptions = [...prescriptions].sort(
+    (a, b) => a.recommendation_rank - b.recommendation_rank
+  )
+  const maxCost = Math.max(...prescriptions.map((p) => p.estimated_cost), 1)
+  const maxDays = Math.max(...prescriptions.map((p) => p.delivery_days), 1)
+  const maxRisk = Math.max(...prescriptions.map((p) => p.risk_score), 1)
+
+  const prescriptionsWithScore = sortedPrescriptions.map((p) => ({
+    ...p,
+    valueScore: computeValueScore(p, maxCost, maxDays, maxRisk),
+  }))
+
+  const selectedOption = prescriptionsWithScore.find((p) => p.id === selectedPrescriptionId)
 
   return (
     <div className="p-6 text-white space-y-6">
@@ -385,10 +494,164 @@ function DisruptionDetails() {
         )}
       </div>
 
+      {/* Prescription Recommendations */}
       <div className="bg-gray-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold mb-2">Prescription Recommendations</h3>
-        <p className="text-gray-500 text-sm">Coming Day 10-11 — optimization engine results</p>
+        <h3 className="text-lg font-semibold mb-4">Prescription Recommendations</h3>
+        {prescriptionsWithScore.length === 0 ? (
+          <p className="text-gray-500 text-sm">No recommendations available for this shipment.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {prescriptionsWithScore.map((p) => {
+              const isSelected = selectedPrescriptionId === p.id
+              const riskBadge = getPrescriptionRiskBadge(p.risk_score)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPrescriptionId(p.id)}
+                  className={`text-left rounded-xl p-4 border transition ${
+                    isSelected
+                      ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/50'
+                      : 'border-gray-700 bg-gray-900/50 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold">{p.option_name}</h4>
+                    <div className="flex items-center gap-1.5">
+                      {p.recommendation_rank === 1 && (
+                        <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                          Best Option
+                        </span>
+                      )}
+                      {isSelected && <CheckCircle size={16} className="text-purple-400" />}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-4">{p.description}</p>
+
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-gray-500">Estimated Cost</span>
+                        <span className="font-semibold">₹{p.estimated_cost.toLocaleString()}</span>
+                      </div>
+                      <ComparisonBar value={p.estimated_cost} max={maxCost} colorClass="bg-blue-400" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-gray-500">Delivery Time</span>
+                        <span className="font-semibold">{p.delivery_days} days</span>
+                      </div>
+                      <ComparisonBar value={p.delivery_days} max={maxDays} colorClass="bg-pink-400" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1 items-center">
+                        <span className="text-gray-500">Risk Score</span>
+                        <span className={`font-semibold flex items-center gap-1.5 ${riskBadge.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${riskBadge.dot}`}></span>
+                          {p.risk_score}% ({riskBadge.label})
+                        </span>
+                      </div>
+                      <ComparisonBar value={p.risk_score} max={maxRisk} colorClass="bg-orange-400" />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-gray-700 flex items-start gap-1.5 text-xs text-gray-500">
+                    <Info size={12} className="mt-0.5 flex-shrink-0" />
+                    {getRankExplanation(p.recommendation_rank)}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Compare Alternatives */}
+      {prescriptionsWithScore.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="text-lg font-semibold">Compare Alternatives</h3>
+            <button
+              onClick={() => exportComparisonCSV(prescriptionsWithScore)}
+              className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 transition rounded-lg px-3 py-1.5 text-xs font-semibold"
+            >
+              <Download size={14} />
+              Export CSV
+            </button>
+          </div>
+
+          {/* Selection summary */}
+          {selectedOption && (
+            <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/40 rounded-lg px-4 py-2.5 mb-6 text-sm">
+              <CheckCircle size={16} className="text-purple-400 flex-shrink-0" />
+              <span>
+                You selected: <span className="font-semibold text-purple-300">{selectedOption.option_name}</span>
+                {' '}— ₹{selectedOption.estimated_cost.toLocaleString()}, {selectedOption.delivery_days} days, value score {selectedOption.valueScore}/100
+              </span>
+            </div>
+          )}
+
+          <div className="overflow-x-auto mb-6">
+            <table className="w-full text-left text-sm min-w-[600px]">
+              <thead>
+                <tr className="text-gray-400 border-b border-gray-700">
+                  <th className="pb-2">Option</th>
+                  <th className="pb-2">Cost</th>
+                  <th className="pb-2">Delivery</th>
+                  <th className="pb-2">Risk</th>
+                  <th className="pb-2">Value Score</th>
+                  <th className="pb-2">Rank</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prescriptionsWithScore.map((p) => {
+                  const riskBadge = getPrescriptionRiskBadge(p.risk_score)
+                  const isSelected = selectedPrescriptionId === p.id
+                  return (
+                    <tr
+                      key={p.id}
+                      onClick={() => setSelectedPrescriptionId(p.id)}
+                      className={`border-b border-gray-700 cursor-pointer transition ${
+                        isSelected ? 'bg-purple-500/10' : 'hover:bg-gray-700/30'
+                      }`}
+                    >
+                      <td className="py-3 font-medium flex items-center gap-2">
+                        {isSelected && <CheckCircle size={14} className="text-purple-400" />}
+                        {p.option_name}
+                      </td>
+                      <td className="py-3">₹{p.estimated_cost.toLocaleString()}</td>
+                      <td className="py-3">{p.delivery_days} days</td>
+                      <td className={`py-3 ${riskBadge.text}`}>
+                        {p.risk_score}% ({riskBadge.label})
+                      </td>
+                      <td className="py-3 font-semibold text-purple-300">{p.valueScore}/100</td>
+                      <td className="py-3">
+                        {p.recommendation_rank === 1 ? (
+                          <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                            #1 Best
+                          </span>
+                        ) : (
+                          `#${p.recommendation_rank}`
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mini comparison chart */}
+          <div>
+            <p className="text-sm font-semibold mb-3">Side-by-side visual comparison</p>
+            <MiniComparisonChart
+              prescriptions={prescriptionsWithScore}
+              maxCost={maxCost}
+              maxDays={maxDays}
+              maxRisk={maxRisk}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
