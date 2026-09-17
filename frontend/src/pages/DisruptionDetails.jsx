@@ -506,6 +506,56 @@ function DisruptionDetails() {
           </div>
         )}
       </div>
+      {sortedPrescriptions.length > 0 && (
+  <div className="bg-gray-800 rounded-xl p-6 overflow-x-auto">
+    <h3 className="text-lg font-semibold mb-4">Compare Alternatives</h3>
+    <table className="w-full text-left text-sm min-w-[500px]">
+      <thead>
+        <tr className="text-gray-400 border-b border-gray-700">
+          <th className="pb-2">Option</th>
+          <th className="pb-2">Cost</th>
+          <th className="pb-2">Delivery</th>
+          <th className="pb-2">Risk</th>
+          <th className="pb-2">Rank</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sortedPrescriptions.map((p) => {
+          const riskBadge = getPrescriptionRiskBadge(p.risk_score)
+          const isSelected = selectedPrescriptionId === p.id
+          return (
+            <tr
+              key={p.id}
+              onClick={() => setSelectedPrescriptionId(p.id)}
+              className={`border-b border-gray-700 cursor-pointer transition ${
+                isSelected ? 'bg-purple-500/10' : 'hover:bg-gray-700/30'
+              }`}
+            >
+              <td className="py-3 font-medium flex items-center gap-2">
+                {isSelected && <CheckCircle size={14} className="text-purple-400" />}
+                {p.option_name}
+              </td>
+              <td className="py-3">₹{p.estimated_cost.toLocaleString()}</td>
+              <td className="py-3">{p.delivery_days} days</td>
+              <td className={`py-3 ${riskBadge.text}`}>
+                {p.risk_score}% ({riskBadge.label})
+              </td>
+              <td className="py-3">
+                {p.recommendation_rank === 1 ? (
+                  <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                    #1 Best
+                  </span>
+                ) : (
+                  `#${p.recommendation_rank}`
+                )}
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  </div>
+)}
     </div>
   )
 }
