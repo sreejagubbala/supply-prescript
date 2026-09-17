@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Search, X, ArrowUp, ArrowDown, Download } from 'lucide-react'
 import { fetchShipments } from '../api/shipments'
+import { useNavigate } from 'react-router-dom'
 
 const mockShipments = [
   { id: 'SHP-001', origin: 'Chennai', destination: 'Bengaluru', status: 'On-Time', eta: '2026-08-28', riskScore: 12 },
@@ -78,7 +79,19 @@ function exportToCSV(data) {
   URL.revokeObjectURL(url)
 }
 
+function normalizeShipment(raw) {
+  return {
+    id: String(raw.id ?? ''),
+    origin: String(raw.origin ?? ''),
+    destination: String(raw.destination ?? ''),
+    status: String(raw.status ?? 'Unknown'),
+    eta: String(raw.eta ?? ''),
+    riskScore: Number(raw.riskScore ?? raw.risk_score ?? 0),
+  }
+}
+
 function Shipments() {
+  const navigate = useNavigate()
   const [shipments, setShipments] = useState([])
   const [statusFilter, setStatusFilter] = useState('All')
   const [search, setSearch] = useState('')
@@ -89,20 +102,24 @@ function Shipments() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-    useEffect(() => {
+      useEffect(() => {
     fetchShipments()
-      .then((data) => setShipments(data))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.shipments || []
+        setShipments(list.map(normalizeShipment))
+      })
       .catch(() => {
         console.warn('Backend not available yet — using mock data')
-        setShipments(mockShipments)
+        setShipments(mockShipments.map(normalizeShipment))
       })
   }, [])
-  const filtered = shipments.filter((s) => {
+
+    const filtered = shipments.filter((s) => {
     const matchesStatus = statusFilter === 'All' || s.status === statusFilter
     const matchesSearch =
-      s.id.toLowerCase().includes(search.toLowerCase()) ||
-      s.origin.toLowerCase().includes(search.toLowerCase()) ||
-      s.destination.toLowerCase().includes(search.toLowerCase())
+      String(s.id).toLowerCase().includes(search.toLowerCase()) ||
+      String(s.origin).toLowerCase().includes(search.toLowerCase()) ||
+      String(s.destination).toLowerCase().includes(search.toLowerCase())
     const matchesDateFrom = !dateFrom || s.eta >= dateFrom
     const matchesDateTo = !dateTo || s.eta <= dateTo
     return matchesStatus && matchesSearch && matchesDateFrom && matchesDateTo
@@ -356,6 +373,10 @@ function Shipments() {
               </p>
               <p><span className="text-gray-400">ETA:</span> {selected.eta}</p>
               <p><span className="text-gray-400">Delay Risk Score:</span> <span className={riskColor(selected.riskScore)}>{selected.riskScore}%</span></p>
+              <button
+                     onClick={() => navigate(`/shipments/${selected.id}`)}
+                    className="mt-4 w-full bg-purple-600 hover:bg-purple-700 transition rounded-lg py-2 text-sm font-semibold"> View Full Disruption Details
+              </button>
             </div>
           </div>
         </div>

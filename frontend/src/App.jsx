@@ -1,3 +1,4 @@
+import DisruptionDetails from './pages/DisruptionDetails'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -23,6 +24,7 @@ function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/decision-roi" element={<DecisionROI />} />
             <Route path="/decision-history" element={<DecisionHistory />} />
+            <Route path="/shipments/:shipmentId" element={<DisruptionDetails />} />
           </Routes>
         </div>
       </div>
