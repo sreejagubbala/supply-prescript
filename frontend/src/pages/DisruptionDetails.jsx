@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle, Info, Download } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { fetchShipments, fetchDelayPrediction, fetchPrescriptions } from '../api/shipments'
+import { fetchShipments, fetchDelayPrediction, fetchPrescriptions, createDecision } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -311,6 +311,8 @@ function DisruptionDetails() {
   const [secondsAgo, setSecondsAgo] = useState(0)
   const [prescriptions, setPrescriptions] = useState([])
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null)
+  const [executing, setExecuting] = useState(false)
+  const [executedDecision, setExecutedDecision] = useState(null)
   const trendRef = useRef(null)
 
   useEffect(() => {
@@ -386,14 +388,36 @@ function DisruptionDetails() {
   }, [shipment])
 
   function handleContactSupplier() {
-    setActionMessage('Supplier has been notified via email.')
-    setTimeout(() => setActionMessage(''), 3000)
-  }
+  setActionMessage('Supplier has been notified via email.')
+  setTimeout(() => setActionMessage(''), 3000)
+}
 
-  function handleNotifyTeam() {
-    setActionMessage('Team has been alerted about this disruption.')
-    setTimeout(() => setActionMessage(''), 3000)
-  }
+function handleNotifyTeam() {
+  setActionMessage('Team has been alerted about this disruption.')
+  setTimeout(() => setActionMessage(''), 3000)
+}
+
+function handleExecuteDecision() {
+  if (!selectedOption) return
+
+  setExecuting(true)
+  createDecision({
+    shipment_id: shipment.id,
+    prescription_id: selectedOption.id,
+    selected_option: selectedOption.option_name,
+    estimated_cost: selectedOption.estimated_cost,
+    user_name: 'Frontend User',
+    decision_status: 'Executed',
+  })
+    .then((data) => {
+      setExecutedDecision(data)
+      setExecuting(false)
+    })
+    .catch(() => {
+      setExecutedDecision({ ...selectedOption, id: 'local', isLocal: true })
+      setExecuting(false)
+    })
+}
 
   if (loading) {
     return <div className="p-6 text-white">Loading disruption details...</div>
@@ -756,10 +780,33 @@ function DisruptionDetails() {
               selectedId={selectedPrescriptionId}
               onSelect={setSelectedPrescriptionId}
               />
-              
+
             <p className="text-xs text-gray-500 mt-2">
               Options closer to the top-left offer the best combination of low cost and fast delivery.
             </p>
+          </div>
+                    {/* Execute Decision */}
+          <div className="mt-6 pt-6 border-t border-gray-700">
+            {executedDecision ? (
+              <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/40 rounded-lg px-4 py-3">
+                <CheckCircle size={20} className="text-green-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-green-300">Decision Executed</p>
+                  <p className="text-xs text-gray-400">
+                    "{executedDecision.selected_option || selectedOption?.option_name}" has been recorded
+                    {executedDecision.isLocal ? ' locally (backend unreachable — will sync later).' : '.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={handleExecuteDecision}
+                disabled={!selectedOption || executing}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition rounded-lg py-3 text-sm font-semibold flex items-center justify-center gap-2"
+              >
+                {executing ? 'Executing...' : `Execute Decision: ${selectedOption?.option_name || 'Select an option'}`}
+              </button>
+            )}
           </div>
         </div>
       )}

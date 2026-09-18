@@ -59,3 +59,21 @@ export async function fetchPrescriptions(shipmentId) {
   }
   return response.json()
 }
+
+export async function createDecision(decisionData) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 3000)
+
+  const response = await fetch(`${API_BASE_URL}/decisions/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(decisionData),
+    signal: controller.signal,
+  })
+  clearTimeout(timeout)
+
+  if (!response.ok) {
+    throw new Error('Failed to create decision')
+  }
+  return response.json()
+}
