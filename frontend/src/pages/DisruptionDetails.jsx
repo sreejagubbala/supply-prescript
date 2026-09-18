@@ -205,36 +205,96 @@ function MiniComparisonChart({ prescriptions, maxCost, maxDays, maxRisk }) {
 
 // Plots each option by cost (x-axis) and delivery speed (y-axis) so the
 // cost/speed trade-off is visible at a glance. Top-left = cheap and fast.
-function CostSpeedScatter({ prescriptions, maxCost, maxDays }) {
-  return (
-    <div className="relative w-full h-56 bg-gray-900/50 rounded-lg border border-gray-700 p-4">
-      <span className="absolute top-2 left-2 text-[10px] text-gray-500">Faster</span>
-      <span className="absolute bottom-2 left-2 text-[10px] text-gray-500">Slower</span>
-      <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-gray-500">Cheaper → Expensive</span>
+function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId, onSelect }) {
+  const gridLines = [0, 25, 50, 75, 100]
+  const costTicks = gridLines.map((pct) => Math.round((pct / 100) * maxCost))
+  const dayTicks = gridLines.map((pct) => Math.round((pct / 100) * maxDays))
 
-      <div className="relative w-full h-full">
-        {prescriptions.map((p) => {
-          const xPct = maxCost > 0 ? (p.estimated_cost / maxCost) * 85 + 5 : 5
-          const yPct = maxDays > 0 ? (p.delivery_days / maxDays) * 85 + 5 : 5
-          const isBest = p.recommendation_rank === 1
-          return (
+  return (
+    <div>
+      <div className="relative w-full h-64 bg-gray-900/50 rounded-lg border border-gray-700 p-4 pl-14 pb-8">
+        {/* Gridlines */}
+        {gridLines.map((pct) => (
+          <div key={`h-${pct}`}>
             <div
-              key={p.id}
-              className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${xPct}%`, top: `${yPct}%` }}
-              title={`${p.option_name}: ₹${p.estimated_cost.toLocaleString()}, ${p.delivery_days} days`}
+              className="absolute left-14 right-4 border-t border-gray-800"
+              style={{ top: `${5 + pct * 0.85}%` }}
+            />
+            <span
+              className="absolute left-0 text-[9px] text-gray-500 -translate-y-1/2"
+              style={{ top: `${5 + pct * 0.85}%` }}
             >
-              <div
-                className={`w-4 h-4 rounded-full border-2 ${
-                  isBest
-                    ? 'bg-purple-500 border-purple-300'
-                    : 'bg-gray-600 border-gray-400'
-                }`}
-              />
-              <span className="text-[10px] text-gray-300 mt-1 whitespace-nowrap">{p.option_name}</span>
-            </div>
-          )
-        })}
+              {dayTicks[gridLines.indexOf(pct)]}d
+            </span>
+          </div>
+        ))}
+        {gridLines.map((pct) => (
+          <div key={`v-${pct}`}>
+            <div
+              className="absolute top-4 bottom-8 border-l border-gray-800"
+              style={{ left: `calc(3.5rem + ${pct * 0.85}%)` }}
+            />
+            <span
+              className="absolute bottom-0 text-[9px] text-gray-500 -translate-x-1/2"
+              style={{ left: `calc(3.5rem + ${pct * 0.85}%)` }}
+            >
+              ₹{costTicks[gridLines.indexOf(pct)] >= 1000 ? `${Math.round(costTicks[gridLines.indexOf(pct)] / 1000)}k` : costTicks[gridLines.indexOf(pct)]}
+            </span>
+          </div>
+        ))}
+
+        {/* Reference diagonal (average trade-off line) */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          <line
+            x1="15%" y1="90%" x2="90%" y2="5%"
+            stroke="#6b7280" strokeWidth="1" strokeDasharray="4 4"
+          />
+        </svg>
+
+        {/* Data points */}
+        <div className="relative w-full h-full">
+          {prescriptions.map((p) => {
+            const xPct = maxCost > 0 ? (p.estimated_cost / maxCost) * 85 + 5 : 5
+            const yPct = maxDays > 0 ? (p.delivery_days / maxDays) * 85 + 5 : 5
+            const isBest = p.recommendation_rank === 1
+            const isSelected = selectedId === p.id
+            const size = maxRisk > 0 ? 12 + (p.risk_score / maxRisk) * 10 : 16
+            return (
+              <button
+                key={p.id}
+                onClick={() => onSelect(p.id)}
+                className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 group"
+                style={{ left: `${xPct}%`, top: `${yPct}%` }}
+                title={`${p.option_name}: ₹${p.estimated_cost.toLocaleString()}, ${p.delivery_days} days, ${p.risk_score}% risk`}
+              >
+                <div
+                  className={`rounded-full border-2 transition ${
+                    isBest ? 'bg-purple-500 border-purple-300' : 'bg-gray-600 border-gray-400'
+                  } ${isSelected ? 'ring-2 ring-white' : 'group-hover:scale-110'}`}
+                  style={{ width: `${size}px`, height: `${size}px` }}
+                />
+                <span className="text-[10px] text-gray-300 mt-1 whitespace-nowrap">{p.option_name}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-gray-400">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-purple-500 border-2 border-purple-300"></span>
+          Recommended option
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-gray-600 border-2 border-gray-400"></span>
+          Other options
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-4 border-t border-dashed border-gray-500"></span>
+          Average trade-off line
+        </div>
+        <div>Dot size = risk level</div>
       </div>
     </div>
   )
@@ -692,7 +752,11 @@ function DisruptionDetails() {
               prescriptions={prescriptionsWithScore}
               maxCost={maxCost}
               maxDays={maxDays}
-            />
+              maxRisk={maxRisk}
+              selectedId={selectedPrescriptionId}
+              onSelect={setSelectedPrescriptionId}
+              />
+              
             <p className="text-xs text-gray-500 mt-2">
               Options closer to the top-left offer the best combination of low cost and fast delivery.
             </p>
