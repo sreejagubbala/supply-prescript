@@ -148,9 +148,6 @@ function ComparisonBar({ value, max, colorClass }) {
   )
 }
 
-// Combines cost, delivery time, and risk into one 0-100 "value score" where
-// higher is better. Cheaper, faster, and lower-risk options score higher.
-// This is a simple normalized-and-averaged heuristic, not a model output.
 function computeValueScore(p, maxCost, maxDays, maxRisk) {
   const costScore = maxCost > 0 ? (1 - p.estimated_cost / maxCost) * 100 : 0
   const speedScore = maxDays > 0 ? (1 - p.delivery_days / maxDays) * 100 : 0
@@ -202,6 +199,43 @@ function MiniComparisonChart({ prescriptions, maxCost, maxDays, maxRisk }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// Plots each option by cost (x-axis) and delivery speed (y-axis) so the
+// cost/speed trade-off is visible at a glance. Top-left = cheap and fast.
+function CostSpeedScatter({ prescriptions, maxCost, maxDays }) {
+  return (
+    <div className="relative w-full h-56 bg-gray-900/50 rounded-lg border border-gray-700 p-4">
+      <span className="absolute top-2 left-2 text-[10px] text-gray-500">Faster</span>
+      <span className="absolute bottom-2 left-2 text-[10px] text-gray-500">Slower</span>
+      <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-gray-500">Cheaper → Expensive</span>
+
+      <div className="relative w-full h-full">
+        {prescriptions.map((p) => {
+          const xPct = maxCost > 0 ? (p.estimated_cost / maxCost) * 85 + 5 : 5
+          const yPct = maxDays > 0 ? (p.delivery_days / maxDays) * 85 + 5 : 5
+          const isBest = p.recommendation_rank === 1
+          return (
+            <div
+              key={p.id}
+              className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${xPct}%`, top: `${yPct}%` }}
+              title={`${p.option_name}: ₹${p.estimated_cost.toLocaleString()}, ${p.delivery_days} days`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full border-2 ${
+                  isBest
+                    ? 'bg-purple-500 border-purple-300'
+                    : 'bg-gray-600 border-gray-400'
+                }`}
+              />
+              <span className="text-[10px] text-gray-300 mt-1 whitespace-nowrap">{p.option_name}</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -649,6 +683,19 @@ function DisruptionDetails() {
               maxDays={maxDays}
               maxRisk={maxRisk}
             />
+          </div>
+
+          {/* Cost vs Speed scatter */}
+          <div className="mt-6">
+            <p className="text-sm font-semibold mb-3">Cost vs Speed Trade-off</p>
+            <CostSpeedScatter
+              prescriptions={prescriptionsWithScore}
+              maxCost={maxCost}
+              maxDays={maxDays}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Options closer to the top-left offer the best combination of low cost and fast delivery.
+            </p>
           </div>
         </div>
       )}
