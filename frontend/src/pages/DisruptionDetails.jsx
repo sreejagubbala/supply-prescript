@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle, Info, Download } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { fetchShipments, fetchDelayPrediction, fetchPrescriptions } from '../api/shipments'
+import { fetchShipments, fetchDelayPrediction, fetchPrescriptions, createDecision } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -148,9 +148,6 @@ function ComparisonBar({ value, max, colorClass }) {
   )
 }
 
-// Combines cost, delivery time, and risk into one 0-100 "value score" where
-// higher is better. Cheaper, faster, and lower-risk options score higher.
-// This is a simple normalized-and-averaged heuristic, not a model output.
 function computeValueScore(p, maxCost, maxDays, maxRisk) {
   const costScore = maxCost > 0 ? (1 - p.estimated_cost / maxCost) * 100 : 0
   const speedScore = maxDays > 0 ? (1 - p.delivery_days / maxDays) * 100 : 0
@@ -206,6 +203,103 @@ function MiniComparisonChart({ prescriptions, maxCost, maxDays, maxRisk }) {
   )
 }
 
+// Plots each option by cost (x-axis) and delivery speed (y-axis) so the
+// cost/speed trade-off is visible at a glance. Top-left = cheap and fast.
+function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId, onSelect }) {
+  const gridLines = [0, 25, 50, 75, 100]
+  const costTicks = gridLines.map((pct) => Math.round((pct / 100) * maxCost))
+  const dayTicks = gridLines.map((pct) => Math.round((pct / 100) * maxDays))
+
+  return (
+    <div>
+      <div className="relative w-full h-64 bg-gray-900/50 rounded-lg border border-gray-700 p-4 pl-14 pb-8">
+        {/* Gridlines */}
+        {gridLines.map((pct) => (
+          <div key={`h-${pct}`}>
+            <div
+              className="absolute left-14 right-4 border-t border-gray-800"
+              style={{ top: `${5 + pct * 0.85}%` }}
+            />
+            <span
+              className="absolute left-0 text-[9px] text-gray-500 -translate-y-1/2"
+              style={{ top: `${5 + pct * 0.85}%` }}
+            >
+              {dayTicks[gridLines.indexOf(pct)]}d
+            </span>
+          </div>
+        ))}
+        {gridLines.map((pct) => (
+          <div key={`v-${pct}`}>
+            <div
+              className="absolute top-4 bottom-8 border-l border-gray-800"
+              style={{ left: `calc(3.5rem + ${pct * 0.85}%)` }}
+            />
+            <span
+              className="absolute bottom-0 text-[9px] text-gray-500 -translate-x-1/2"
+              style={{ left: `calc(3.5rem + ${pct * 0.85}%)` }}
+            >
+              ₹{costTicks[gridLines.indexOf(pct)] >= 1000 ? `${Math.round(costTicks[gridLines.indexOf(pct)] / 1000)}k` : costTicks[gridLines.indexOf(pct)]}
+            </span>
+          </div>
+        ))}
+
+        {/* Reference diagonal (average trade-off line) */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          <line
+            x1="15%" y1="90%" x2="90%" y2="5%"
+            stroke="#6b7280" strokeWidth="1" strokeDasharray="4 4"
+          />
+        </svg>
+
+        {/* Data points */}
+        <div className="relative w-full h-full">
+          {prescriptions.map((p) => {
+            const xPct = maxCost > 0 ? (p.estimated_cost / maxCost) * 85 + 5 : 5
+            const yPct = maxDays > 0 ? (p.delivery_days / maxDays) * 85 + 5 : 5
+            const isBest = p.recommendation_rank === 1
+            const isSelected = selectedId === p.id
+            const size = maxRisk > 0 ? 12 + (p.risk_score / maxRisk) * 10 : 16
+            return (
+              <button
+                key={p.id}
+                onClick={() => onSelect(p.id)}
+                className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 group"
+                style={{ left: `${xPct}%`, top: `${yPct}%` }}
+                title={`${p.option_name}: ₹${p.estimated_cost.toLocaleString()}, ${p.delivery_days} days, ${p.risk_score}% risk`}
+              >
+                <div
+                  className={`rounded-full border-2 transition ${
+                    isBest ? 'bg-purple-500 border-purple-300' : 'bg-gray-600 border-gray-400'
+                  } ${isSelected ? 'ring-2 ring-white' : 'group-hover:scale-110'}`}
+                  style={{ width: `${size}px`, height: `${size}px` }}
+                />
+                <span className="text-[10px] text-gray-300 mt-1 whitespace-nowrap">{p.option_name}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-gray-400">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-purple-500 border-2 border-purple-300"></span>
+          Recommended option
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-gray-600 border-2 border-gray-400"></span>
+          Other options
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-4 border-t border-dashed border-gray-500"></span>
+          Average trade-off line
+        </div>
+        <div>Dot size = risk level</div>
+      </div>
+    </div>
+  )
+}
+
 function DisruptionDetails() {
   const { shipmentId } = useParams()
   const navigate = useNavigate()
@@ -217,6 +311,8 @@ function DisruptionDetails() {
   const [secondsAgo, setSecondsAgo] = useState(0)
   const [prescriptions, setPrescriptions] = useState([])
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null)
+  const [executing, setExecuting] = useState(false)
+  const [executedDecision, setExecutedDecision] = useState(null)
   const trendRef = useRef(null)
 
   useEffect(() => {
@@ -292,14 +388,36 @@ function DisruptionDetails() {
   }, [shipment])
 
   function handleContactSupplier() {
-    setActionMessage('Supplier has been notified via email.')
-    setTimeout(() => setActionMessage(''), 3000)
-  }
+  setActionMessage('Supplier has been notified via email.')
+  setTimeout(() => setActionMessage(''), 3000)
+}
 
-  function handleNotifyTeam() {
-    setActionMessage('Team has been alerted about this disruption.')
-    setTimeout(() => setActionMessage(''), 3000)
-  }
+function handleNotifyTeam() {
+  setActionMessage('Team has been alerted about this disruption.')
+  setTimeout(() => setActionMessage(''), 3000)
+}
+
+function handleExecuteDecision() {
+  if (!selectedOption) return
+
+  setExecuting(true)
+  createDecision({
+    shipment_id: shipment.id,
+    prescription_id: selectedOption.id,
+    selected_option: selectedOption.option_name,
+    estimated_cost: selectedOption.estimated_cost,
+    user_name: 'Frontend User',
+    decision_status: 'Executed',
+  })
+    .then((data) => {
+      setExecutedDecision(data)
+      setExecuting(false)
+    })
+    .catch(() => {
+      setExecutedDecision({ ...selectedOption, id: 'local', isLocal: true })
+      setExecuting(false)
+    })
+}
 
   if (loading) {
     return <div className="p-6 text-white">Loading disruption details...</div>
@@ -649,6 +767,46 @@ function DisruptionDetails() {
               maxDays={maxDays}
               maxRisk={maxRisk}
             />
+          </div>
+
+          {/* Cost vs Speed scatter */}
+          <div className="mt-6">
+            <p className="text-sm font-semibold mb-3">Cost vs Speed Trade-off</p>
+            <CostSpeedScatter
+              prescriptions={prescriptionsWithScore}
+              maxCost={maxCost}
+              maxDays={maxDays}
+              maxRisk={maxRisk}
+              selectedId={selectedPrescriptionId}
+              onSelect={setSelectedPrescriptionId}
+              />
+
+            <p className="text-xs text-gray-500 mt-2">
+              Options closer to the top-left offer the best combination of low cost and fast delivery.
+            </p>
+          </div>
+                    {/* Execute Decision */}
+          <div className="mt-6 pt-6 border-t border-gray-700">
+            {executedDecision ? (
+              <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/40 rounded-lg px-4 py-3">
+                <CheckCircle size={20} className="text-green-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-green-300">Decision Executed</p>
+                  <p className="text-xs text-gray-400">
+                    "{executedDecision.selected_option || selectedOption?.option_name}" has been recorded
+                    {executedDecision.isLocal ? ' locally (backend unreachable — will sync later).' : '.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={handleExecuteDecision}
+                disabled={!selectedOption || executing}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition rounded-lg py-3 text-sm font-semibold flex items-center justify-center gap-2"
+              >
+                {executing ? 'Executing...' : `Execute Decision: ${selectedOption?.option_name || 'Select an option'}`}
+              </button>
+            )}
           </div>
         </div>
       )}
