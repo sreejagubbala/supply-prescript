@@ -19,4 +19,3 @@ def test_supplier_detail_api_exists():
     ]
 
     assert "/api/suppliers/{supplier_id}" in routes
-  
