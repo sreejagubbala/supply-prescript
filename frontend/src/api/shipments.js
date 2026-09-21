@@ -77,3 +77,17 @@ export async function createDecision(decisionData) {
   }
   return response.json()
 }
+export async function fetchDecisions() {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 1500)
+
+  const response = await fetch(`${API_BASE_URL}/decisions/`, {
+    signal: controller.signal,
+  })
+  clearTimeout(timeout)
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch decisions')
+  }
+  return response.json()
+}
