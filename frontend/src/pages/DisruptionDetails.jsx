@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle, Info, Download } from 'lucide-react'
+import { ArrowLeft, MapPin, Calendar, AlertTriangle, Mail, Bell, Package, Truck, CheckCircle2, RefreshCw, CheckCircle, HelpCircle, Info, Download, Lock, Undo2, X, Clock } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { fetchShipments, fetchDelayPrediction, fetchPrescriptions, createDecision } from '../api/shipments'
+import { fetchShipments, fetchDelayPrediction, fetchPrescriptions, createDecision, fetchDecisions } from '../api/shipments'
 
 function getRiskSeverity(score) {
   const s = Number(score) || 0
@@ -203,9 +203,7 @@ function MiniComparisonChart({ prescriptions, maxCost, maxDays, maxRisk }) {
   )
 }
 
-// Plots each option by cost (x-axis) and delivery speed (y-axis) so the
-// cost/speed trade-off is visible at a glance. Top-left = cheap and fast.
-function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId, onSelect }) {
+function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId, onSelect, locked }) {
   const gridLines = [0, 25, 50, 75, 100]
   const costTicks = gridLines.map((pct) => Math.round((pct / 100) * maxCost))
   const dayTicks = gridLines.map((pct) => Math.round((pct / 100) * maxDays))
@@ -213,7 +211,6 @@ function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId
   return (
     <div>
       <div className="relative w-full h-64 bg-gray-900/50 rounded-lg border border-gray-700 p-4 pl-14 pb-8">
-        {/* Gridlines */}
         {gridLines.map((pct) => (
           <div key={`h-${pct}`}>
             <div
@@ -243,7 +240,6 @@ function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId
           </div>
         ))}
 
-        {/* Reference diagonal (average trade-off line) */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
           <line
             x1="15%" y1="90%" x2="90%" y2="5%"
@@ -251,7 +247,6 @@ function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId
           />
         </svg>
 
-        {/* Data points */}
         <div className="relative w-full h-full">
           {prescriptions.map((p) => {
             const xPct = maxCost > 0 ? (p.estimated_cost / maxCost) * 85 + 5 : 5
@@ -262,15 +257,16 @@ function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId
             return (
               <button
                 key={p.id}
-                onClick={() => onSelect(p.id)}
-                className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 group"
+                onClick={() => !locked && onSelect(p.id)}
+                disabled={locked}
+                className={`absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 group ${locked ? 'cursor-not-allowed' : ''}`}
                 style={{ left: `${xPct}%`, top: `${yPct}%` }}
                 title={`${p.option_name}: ₹${p.estimated_cost.toLocaleString()}, ${p.delivery_days} days, ${p.risk_score}% risk`}
               >
                 <div
                   className={`rounded-full border-2 transition ${
                     isBest ? 'bg-purple-500 border-purple-300' : 'bg-gray-600 border-gray-400'
-                  } ${isSelected ? 'ring-2 ring-white' : 'group-hover:scale-110'}`}
+                  } ${isSelected ? 'ring-2 ring-white' : !locked ? 'group-hover:scale-110' : ''}`}
                   style={{ width: `${size}px`, height: `${size}px` }}
                 />
                 <span className="text-[10px] text-gray-300 mt-1 whitespace-nowrap">{p.option_name}</span>
@@ -280,7 +276,6 @@ function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId
         </div>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-gray-400">
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-purple-500 border-2 border-purple-300"></span>
@@ -300,6 +295,47 @@ function CostSpeedScatter({ prescriptions, maxCost, maxDays, maxRisk, selectedId
   )
 }
 
+// Confirmation modal shown before a decision is actually executed.
+function ConfirmExecuteModal({ option, onConfirm, onCancel, submitting }) {
+  if (!option) return null
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm relative border border-gray-700">
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 text-gray-400 hover:text-white"
+        >
+          <X size={18} />
+        </button>
+        <h3 className="text-lg font-bold mb-2">Confirm Decision</h3>
+        <p className="text-sm text-gray-400 mb-4">
+          You're about to execute the following decision. This will be recorded and cannot be easily changed.
+        </p>
+        <div className="bg-gray-900/50 rounded-lg p-4 mb-4 text-sm space-y-1.5">
+          <p><span className="text-gray-500">Option:</span> <span className="font-semibold">{option.option_name}</span></p>
+          <p><span className="text-gray-500">Cost:</span> ₹{option.estimated_cost.toLocaleString()}</p>
+          <p><span className="text-gray-500">Delivery:</span> {option.delivery_days} days</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 transition rounded-lg py-2 text-sm font-semibold"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={submitting}
+            className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition rounded-lg py-2 text-sm font-semibold"
+          >
+            {submitting ? 'Executing...' : 'Confirm & Execute'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DisruptionDetails() {
   const { shipmentId } = useParams()
   const navigate = useNavigate()
@@ -313,6 +349,10 @@ function DisruptionDetails() {
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null)
   const [executing, setExecuting] = useState(false)
   const [executedDecision, setExecutedDecision] = useState(null)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [decisionHistory, setDecisionHistory] = useState([])
+  const [undoAvailable, setUndoAvailable] = useState(false)
+  const undoTimerRef = useRef(null)
   const trendRef = useRef(null)
 
   useEffect(() => {
@@ -387,37 +427,69 @@ function DisruptionDetails() {
       .catch(() => setPrescriptions([]))
   }, [shipment])
 
+  function loadDecisionHistory() {
+    if (!shipment) return
+    fetchDecisions()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
+        setDecisionHistory(list.filter((d) => d.shipment_id === shipment.id))
+      })
+      .catch(() => setDecisionHistory([]))
+  }
+
+  useEffect(() => {
+    loadDecisionHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shipment])
+
   function handleContactSupplier() {
-  setActionMessage('Supplier has been notified via email.')
-  setTimeout(() => setActionMessage(''), 3000)
-}
+    setActionMessage('Supplier has been notified via email.')
+    setTimeout(() => setActionMessage(''), 3000)
+  }
 
-function handleNotifyTeam() {
-  setActionMessage('Team has been alerted about this disruption.')
-  setTimeout(() => setActionMessage(''), 3000)
-}
+  function handleNotifyTeam() {
+    setActionMessage('Team has been alerted about this disruption.')
+    setTimeout(() => setActionMessage(''), 3000)
+  }
 
-function handleExecuteDecision() {
-  if (!selectedOption) return
+  function handleConfirmExecute() {
+    if (!selectedOptionRef.current) return
+    const option = selectedOptionRef.current
 
-  setExecuting(true)
-  createDecision({
-    shipment_id: shipment.id,
-    prescription_id: selectedOption.id,
-    selected_option: selectedOption.option_name,
-    estimated_cost: selectedOption.estimated_cost,
-    user_name: 'Frontend User',
-    decision_status: 'Executed',
-  })
-    .then((data) => {
-      setExecutedDecision(data)
-      setExecuting(false)
+    setExecuting(true)
+    createDecision({
+      shipment_id: shipment.id,
+      prescription_id: option.id,
+      selected_option: option.option_name,
+      estimated_cost: option.estimated_cost,
+      user_name: 'Frontend User',
+      decision_status: 'Executed',
     })
-    .catch(() => {
-      setExecutedDecision({ ...selectedOption, id: 'local', isLocal: true })
-      setExecuting(false)
-    })
-}
+      .then((data) => {
+        setExecutedDecision(data)
+        setExecuting(false)
+        setShowConfirm(false)
+        setUndoAvailable(true)
+        loadDecisionHistory()
+        undoTimerRef.current = setTimeout(() => setUndoAvailable(false), 10000)
+      })
+      .catch(() => {
+        setExecutedDecision({ ...option, id: 'local', isLocal: true })
+        setExecuting(false)
+        setShowConfirm(false)
+        setUndoAvailable(true)
+        undoTimerRef.current = setTimeout(() => setUndoAvailable(false), 10000)
+      })
+  }
+
+  function handleUndo() {
+    clearTimeout(undoTimerRef.current)
+    setExecutedDecision(null)
+    setUndoAvailable(false)
+    // Note: this resets the local UI state only. The record already saved to
+    // the backend (if not local) is not deleted, since no DELETE endpoint
+    // exists yet — a real undo would need backend support to fully revert.
+  }
 
   if (loading) {
     return <div className="p-6 text-white">Loading disruption details...</div>
@@ -454,6 +526,7 @@ function handleExecuteDecision() {
   }))
 
   const selectedOption = prescriptionsWithScore.find((p) => p.id === selectedPrescriptionId)
+  const isLocked = !!executedDecision
 
   return (
     <div className="p-6 text-white space-y-6">
@@ -612,9 +685,45 @@ function handleExecuteDecision() {
         )}
       </div>
 
+      {/* Decision History */}
+      {decisionHistory.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Clock size={18} className="text-gray-400" />
+            Decision History for This Shipment
+          </h3>
+          <div className="space-y-2">
+            {decisionHistory
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+              .map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between text-sm bg-gray-900/50 rounded-lg px-4 py-2.5"
+                >
+                  <div>
+                    <span className="font-medium">{d.selected_option}</span>
+                    <span className="text-gray-500 ml-2">₹{Number(d.estimated_cost).toLocaleString()}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {new Date(d.created_at).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Prescription Recommendations */}
       <div className="bg-gray-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold mb-4">Prescription Recommendations</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Prescription Recommendations</h3>
+          {isLocked && (
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              <Lock size={12} />
+              Locked — decision executed
+            </span>
+          )}
+        </div>
         {prescriptionsWithScore.length === 0 ? (
           <p className="text-gray-500 text-sm">No recommendations available for this shipment.</p>
         ) : (
@@ -625,12 +734,13 @@ function handleExecuteDecision() {
               return (
                 <button
                   key={p.id}
-                  onClick={() => setSelectedPrescriptionId(p.id)}
+                  onClick={() => !isLocked && setSelectedPrescriptionId(p.id)}
+                  disabled={isLocked}
                   className={`text-left rounded-xl p-4 border transition ${
                     isSelected
                       ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/50'
                       : 'border-gray-700 bg-gray-900/50 hover:border-gray-500'
-                  }`}
+                  } ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-semibold">{p.option_name}</h4>
@@ -697,7 +807,6 @@ function handleExecuteDecision() {
             </button>
           </div>
 
-          {/* Selection summary */}
           {selectedOption && (
             <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/40 rounded-lg px-4 py-2.5 mb-6 text-sm">
               <CheckCircle size={16} className="text-purple-400 flex-shrink-0" />
@@ -727,10 +836,10 @@ function handleExecuteDecision() {
                   return (
                     <tr
                       key={p.id}
-                      onClick={() => setSelectedPrescriptionId(p.id)}
-                      className={`border-b border-gray-700 cursor-pointer transition ${
-                        isSelected ? 'bg-purple-500/10' : 'hover:bg-gray-700/30'
-                      }`}
+                      onClick={() => !isLocked && setSelectedPrescriptionId(p.id)}
+                      className={`border-b border-gray-700 transition ${
+                        isLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                      } ${isSelected ? 'bg-purple-500/10' : !isLocked ? 'hover:bg-gray-700/30' : ''}`}
                     >
                       <td className="py-3 font-medium flex items-center gap-2">
                         {isSelected && <CheckCircle size={14} className="text-purple-400" />}
@@ -758,7 +867,6 @@ function handleExecuteDecision() {
             </table>
           </div>
 
-          {/* Mini comparison chart */}
           <div>
             <p className="text-sm font-semibold mb-3">Side-by-side visual comparison</p>
             <MiniComparisonChart
@@ -769,7 +877,6 @@ function handleExecuteDecision() {
             />
           </div>
 
-          {/* Cost vs Speed scatter */}
           <div className="mt-6">
             <p className="text-sm font-semibold mb-3">Cost vs Speed Trade-off</p>
             <CostSpeedScatter
@@ -779,39 +886,69 @@ function handleExecuteDecision() {
               maxRisk={maxRisk}
               selectedId={selectedPrescriptionId}
               onSelect={setSelectedPrescriptionId}
-              />
-
+              locked={isLocked}
+            />
             <p className="text-xs text-gray-500 mt-2">
               Options closer to the top-left offer the best combination of low cost and fast delivery.
             </p>
           </div>
-                    {/* Execute Decision */}
+
+          {/* Execute Decision */}
           <div className="mt-6 pt-6 border-t border-gray-700">
             {executedDecision ? (
-              <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/40 rounded-lg px-4 py-3">
-                <CheckCircle size={20} className="text-green-400 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-green-300">Decision Executed</p>
-                  <p className="text-xs text-gray-400">
-                    "{executedDecision.selected_option || selectedOption?.option_name}" has been recorded
-                    {executedDecision.isLocal ? ' locally (backend unreachable — will sync later).' : '.'}
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/40 rounded-lg px-4 py-3">
+                  <CheckCircle size={20} className="text-green-400 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-300">Decision Executed</p>
+                    <p className="text-xs text-gray-400">
+                      "{executedDecision.selected_option || selectedOption?.option_name}" has been recorded
+                      {executedDecision.isLocal ? ' locally (backend unreachable — will sync later).' : '.'}
+                    </p>
+                  </div>
+                  {undoAvailable && (
+                    <button
+                      onClick={handleUndo}
+                      className="flex items-center gap-1.5 text-xs bg-gray-700 hover:bg-gray-600 transition rounded-lg px-3 py-1.5 flex-shrink-0"
+                    >
+                      <Undo2 size={12} />
+                      Undo
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
               <button
-                onClick={handleExecuteDecision}
+                onClick={() => setShowConfirm(true)}
                 disabled={!selectedOption || executing}
                 className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition rounded-lg py-3 text-sm font-semibold flex items-center justify-center gap-2"
               >
-                {executing ? 'Executing...' : `Execute Decision: ${selectedOption?.option_name || 'Select an option'}`}
+                {`Execute Decision: ${selectedOption?.option_name || 'Select an option'}`}
               </button>
             )}
           </div>
         </div>
       )}
+
+      {showConfirm && (
+        <ConfirmExecuteModal
+          option={selectedOption}
+          submitting={executing}
+          onCancel={() => setShowConfirm(false)}
+          onConfirm={() => {
+            selectedOptionRef.current = selectedOption
+            handleConfirmExecute()
+          }}
+        />
+      )}
     </div>
   )
 }
 
+// Ref used so the confirm handler always has the exact option that was
+// selected at the moment "Confirm & Execute" was clicked, even if state
+// updates are still settling.
+const selectedOptionRef = { current: null }
+
 export default DisruptionDetails
+
