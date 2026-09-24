@@ -14,8 +14,8 @@ from ..schemas.outcome import (
     OutcomeResponse
 )
 
+
 router = APIRouter(
-    prefix="/api/outcomes",
     tags=["Outcomes"]
 )
 
