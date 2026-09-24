@@ -71,8 +71,7 @@ app.include_router(decisions.router)
 app.include_router(outcomes.router)
 
 app.include_router(
-    roi.router,
-    prefix="/api/roi"
+    roi.router
 )
 
 
