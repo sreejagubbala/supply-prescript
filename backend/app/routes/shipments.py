@@ -20,32 +20,26 @@ OUTCOME_FILE = BASE_DIR / "data" / "processed" / "decision_outcomes.csv"
     "/",
     response_model=list[ShipmentResponse]
 )
-def get_shipments():
+def get_shipments(
+    db=Depends(get_db)
+):
+    shipments = (
+        db.query(Shipment)
+        .order_by(Shipment.id)
+        .all()
+    )
 
-    df = pd.read_csv(OUTCOME_FILE)
-
-    shipments = []
-
-    for index, row in df.iterrows():
-
-        # Convert outcome information into dashboard status
-        on_time = str(row["On_Time"]).lower() in ["true", "1", "yes"]
-
-        status = "On Track" if on_time else "At Risk"
-
-        # Use delay probability/risk information
-        risk_score = float(row["Late_delivery_risk"])
-
-        shipments.append({
-            "id": index + 1,
-            "origin": str(row["Customer_City"]),
-            "destination": str(row["Order_Region"]),
-            "status": status,
-            "eta": None,
-            "riskScore": risk_score
-        })
-
-    return shipments
+    return [
+        {
+            "id": shipment.id,
+            "origin": shipment.origin,
+            "destination": shipment.destination,
+            "status": shipment.status,
+            "eta": shipment.eta,
+            "riskScore": shipment.risk_score
+        }
+        for shipment in shipments
+    ]
 
 
 @router.get(
