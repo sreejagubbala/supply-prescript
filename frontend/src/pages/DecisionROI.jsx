@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   BarChart,
   Bar,
@@ -24,11 +25,33 @@ import { useNavigate } from "react-router-dom";
 const API_BASE_URL = "http://127.0.0.1:8000";
 
 // ============================================================
+// COLORS
+// ============================================================
+
+const COLORS = {
+  background: "#070d19",
+  card: "#1f2b3d",
+  cardSecondary: "#172235",
+  border: "#334155",
+
+  purple: "#a020f0",
+  purpleLight: "#b23cff",
+
+  green: "#00e676",
+  red: "#ff4d5d",
+
+  text: "#f1f5f9",
+  secondaryText: "#94a3b8",
+  mutedText: "#64748b",
+};
+
+// ============================================================
 // NUMBER FORMAT
 // ============================================================
 
 function number(value) {
   const parsed = Number(value);
+
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
@@ -58,7 +81,7 @@ function DecisionROI() {
   const [error, setError] = useState("");
 
   // ==========================================================
-  // LOAD ROI DATA FROM MEMBER 5 BACKEND
+  // LOAD ROI DATA
   // ==========================================================
 
   useEffect(() => {
@@ -112,7 +135,7 @@ function DecisionROI() {
             : []
         );
       } catch (err) {
-        console.error(err);
+        console.error("ROI Error:", err);
 
         setError(
           "Unable to connect to the Closed-Loop Analytics backend."
@@ -132,7 +155,50 @@ function DecisionROI() {
   if (loading) {
     return (
       <div className="roi-page loading-page">
+        <style>{`
+
+          * {
+            box-sizing: border-box;
+          }
+
+          .loading-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: ${COLORS.background};
+            color: ${COLORS.text};
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .loading-box {
+            background: ${COLORS.card};
+            padding: 40px;
+            border-radius: 14px;
+            border: 1px solid ${COLORS.border};
+            text-align: center;
+          }
+
+          .loading-spinner {
+            font-size: 35px;
+            margin-bottom: 12px;
+            color: ${COLORS.purple};
+          }
+
+          .loading-box h2 {
+            margin: 0 0 8px;
+            color: ${COLORS.text};
+          }
+
+          .loading-box p {
+            margin: 0;
+            color: ${COLORS.secondaryText};
+          }
+
+        `}</style>
+
         <div className="loading-box">
+
           <div className="loading-spinner">
             ⟳
           </div>
@@ -144,42 +210,8 @@ function DecisionROI() {
           <p>
             Reading closed-loop analytics from backend
           </p>
+
         </div>
-
-        <style>{`
-
-          .loading-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f7f8fa;
-            font-family: Arial, Helvetica, sans-serif;
-          }
-
-          .loading-box {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            text-align: center;
-          }
-
-          .loading-spinner {
-            font-size: 35px;
-            margin-bottom: 12px;
-          }
-
-          .loading-box h2 {
-            margin: 0 0 8px;
-          }
-
-          .loading-box p {
-            margin: 0;
-            color: #6b7280;
-          }
-
-        `}</style>
       </div>
     );
   }
@@ -191,6 +223,78 @@ function DecisionROI() {
   if (error) {
     return (
       <div className="roi-page error-page">
+        <style>{`
+
+          * {
+            box-sizing: border-box;
+          }
+
+          .error-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: ${COLORS.background};
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .error-box {
+            width: min(600px, 90%);
+            padding: 30px;
+            background: ${COLORS.card};
+            border: 1px solid ${COLORS.red};
+            border-radius: 14px;
+            text-align: center;
+          }
+
+          .error-box h2 {
+            color: ${COLORS.red};
+            margin-top: 0;
+          }
+
+          .error-box p {
+            color: ${COLORS.secondaryText};
+          }
+
+          .error-help {
+            font-size: 13px;
+          }
+
+          .error-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+          }
+
+          .retry-button,
+          .back-home-button {
+            border: none;
+            border-radius: 8px;
+            padding: 11px 17px;
+            cursor: pointer;
+            font-weight: 600;
+          }
+
+          .retry-button {
+            background: ${COLORS.purple};
+            color: white;
+          }
+
+          .retry-button:hover {
+            background: ${COLORS.purpleLight};
+          }
+
+          .back-home-button {
+            background: #334155;
+            color: ${COLORS.text};
+          }
+
+          .back-home-button:hover {
+            background: #475569;
+          }
+
+        `}</style>
 
         <div className="error-box">
 
@@ -226,68 +330,6 @@ function DecisionROI() {
           </div>
 
         </div>
-
-        <style>{`
-
-          .error-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f7f8fa;
-            font-family: Arial, Helvetica, sans-serif;
-          }
-
-          .error-box {
-            width: min(600px, 90%);
-            padding: 30px;
-            background: white;
-            border: 1px solid #fecaca;
-            border-radius: 12px;
-            text-align: center;
-          }
-
-          .error-box h2 {
-            color: #991b1b;
-            margin-top: 0;
-          }
-
-          .error-box p {
-            color: #6b7280;
-          }
-
-          .error-help {
-            font-size: 13px;
-          }
-
-          .error-actions {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
-          }
-
-          .retry-button,
-          .back-home-button {
-            border: none;
-            border-radius: 8px;
-            padding: 11px 17px;
-            cursor: pointer;
-            font-weight: 600;
-          }
-
-          .retry-button {
-            background: #111827;
-            color: white;
-          }
-
-          .back-home-button {
-            background: #e5e7eb;
-            color: #111827;
-          }
-
-        `}</style>
-
       </div>
     );
   }
@@ -341,6 +383,8 @@ function DecisionROI() {
       action:
         item.Selected_Action ||
         item.selected_action ||
+        item.Recommended_Action ||
+        item.recommended_action ||
         "Unknown",
 
       successRate:
@@ -375,15 +419,21 @@ function DecisionROI() {
           box-sizing: border-box;
         }
 
+        /* =====================================================
+           PAGE
+           ===================================================== */
+
         .roi-page {
           min-height: 100vh;
           padding: 28px;
-          background: #f7f8fa;
-          color: #111827;
+          background: ${COLORS.background};
+          color: ${COLORS.text};
           font-family: Arial, Helvetica, sans-serif;
         }
 
-        /* HEADER */
+        /* =====================================================
+           HEADER
+           ===================================================== */
 
         .roi-header {
           display: flex;
@@ -396,11 +446,12 @@ function DecisionROI() {
         .roi-header h1 {
           margin: 0 0 8px;
           font-size: 30px;
+          color: ${COLORS.text};
         }
 
         .roi-header p {
           margin: 0;
-          color: #6b7280;
+          color: ${COLORS.secondaryText};
           font-size: 15px;
         }
 
@@ -410,14 +461,19 @@ function DecisionROI() {
           gap: 14px;
         }
 
+        /* =====================================================
+           STATUS
+           ===================================================== */
+
         .roi-status {
           display: flex;
           align-items: center;
           gap: 8px;
           padding: 10px 14px;
-          background: white;
-          border: 1px solid #e5e7eb;
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
           border-radius: 8px;
+          color: ${COLORS.text};
           font-size: 14px;
           font-weight: 600;
         }
@@ -425,26 +481,34 @@ function DecisionROI() {
         .status-dot {
           width: 9px;
           height: 9px;
-          background: #22c55e;
+          background: ${COLORS.green};
           border-radius: 50%;
+          box-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
         }
+
+        /* =====================================================
+           BUTTON
+           ===================================================== */
 
         .back-home-button {
           border: none;
           border-radius: 8px;
           padding: 11px 17px;
-          background: #111827;
+          background: ${COLORS.purple};
           color: white;
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
+          transition: 0.2s;
         }
 
         .back-home-button:hover {
-          background: #374151;
+          background: ${COLORS.purpleLight};
         }
 
-        /* KPI */
+        /* =====================================================
+           KPI GRID
+           ===================================================== */
 
         .kpi-grid {
           display: grid;
@@ -454,11 +518,39 @@ function DecisionROI() {
         }
 
         .kpi-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
+          position: relative;
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
+          border-radius: 14px;
           padding: 20px;
-          min-height: 130px;
+          min-height: 135px;
+          overflow: hidden;
+        }
+
+        .kpi-card::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background: ${COLORS.purple};
+        }
+
+        .kpi-card:nth-child(2)::before {
+          background: ${COLORS.green};
+        }
+
+        .kpi-card:nth-child(3)::before {
+          background: ${COLORS.green};
+        }
+
+        .kpi-card:nth-child(4)::before {
+          background: ${COLORS.green};
+        }
+
+        .kpi-card:nth-child(5)::before {
+          background: ${COLORS.purple};
         }
 
         .kpi-icon {
@@ -467,23 +559,26 @@ function DecisionROI() {
         }
 
         .kpi-title {
-          color: #6b7280;
+          color: ${COLORS.secondaryText};
           font-size: 13px;
           margin-bottom: 8px;
         }
 
         .kpi-value {
+          color: ${COLORS.text};
           font-size: 25px;
           font-weight: 700;
         }
 
         .kpi-subtitle {
           margin-top: 7px;
-          color: #9ca3af;
+          color: ${COLORS.mutedText};
           font-size: 12px;
         }
 
-        /* CHARTS */
+        /* =====================================================
+           CHART GRID
+           ===================================================== */
 
         .chart-grid {
           display: grid;
@@ -493,20 +588,21 @@ function DecisionROI() {
         }
 
         .chart-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
+          border-radius: 14px;
           padding: 20px;
         }
 
         .chart-card h2 {
           margin: 0 0 5px;
           font-size: 18px;
+          color: ${COLORS.text};
         }
 
         .chart-card p {
           margin: 0 0 15px;
-          color: #6b7280;
+          color: ${COLORS.secondaryText};
           font-size: 13px;
         }
 
@@ -514,12 +610,40 @@ function DecisionROI() {
           margin-bottom: 20px;
         }
 
-        /* SUMMARY */
+        /* =====================================================
+           RECHARTS
+           ===================================================== */
+
+        .recharts-cartesian-grid-horizontal line,
+        .recharts-cartesian-grid-vertical line {
+          stroke: ${COLORS.border};
+        }
+
+        .recharts-text {
+          fill: ${COLORS.secondaryText};
+        }
+
+        .recharts-legend-item-text {
+          color: ${COLORS.secondaryText} !important;
+        }
+
+        /* =====================================================
+           TOOLTIP
+           ===================================================== */
+
+        .recharts-default-tooltip {
+          background-color: ${COLORS.card} !important;
+          border: 1px solid ${COLORS.border} !important;
+        }
+
+        /* =====================================================
+           SUMMARY
+           ===================================================== */
 
         .roi-summary {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
+          border-radius: 14px;
           padding: 24px;
           margin-bottom: 20px;
         }
@@ -527,11 +651,12 @@ function DecisionROI() {
         .summary-header h2 {
           margin: 0 0 6px;
           font-size: 20px;
+          color: ${COLORS.text};
         }
 
         .summary-header p {
           margin: 0;
-          color: #6b7280;
+          color: ${COLORS.secondaryText};
           font-size: 13px;
         }
 
@@ -544,33 +669,38 @@ function DecisionROI() {
 
         .summary-item {
           padding: 18px;
-          background: #f9fafb;
-          border-radius: 9px;
+          background: ${COLORS.cardSecondary};
+          border: 1px solid ${COLORS.border};
+          border-radius: 10px;
         }
 
         .summary-item span {
           display: block;
-          color: #6b7280;
+          color: ${COLORS.secondaryText};
           font-size: 13px;
           margin-bottom: 8px;
         }
 
         .summary-item strong {
+          color: ${COLORS.text};
           font-size: 21px;
         }
 
-        /* CLOSED LOOP */
+        /* =====================================================
+           CLOSED LOOP
+           ===================================================== */
 
         .closed-loop {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
+          background: ${COLORS.card};
+          border: 1px solid ${COLORS.border};
+          border-radius: 14px;
           padding: 24px;
         }
 
         .closed-loop h2 {
           margin: 0 0 22px;
           font-size: 20px;
+          color: ${COLORS.text};
         }
 
         .loop {
@@ -584,9 +714,9 @@ function DecisionROI() {
           flex: 1;
           text-align: center;
           padding: 18px 10px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid ${COLORS.border};
           border-radius: 10px;
-          background: #f9fafb;
+          background: ${COLORS.cardSecondary};
         }
 
         .loop-number {
@@ -594,7 +724,7 @@ function DecisionROI() {
           height: 38px;
           margin: 0 auto 10px;
           border-radius: 50%;
-          background: #111827;
+          background: ${COLORS.purple};
           color: white;
           display: flex;
           align-items: center;
@@ -605,24 +735,29 @@ function DecisionROI() {
         .loop-step strong {
           display: block;
           margin-bottom: 5px;
+          color: ${COLORS.text};
         }
 
         .loop-step span {
-          color: #6b7280;
+          color: ${COLORS.secondaryText};
           font-size: 12px;
         }
 
         .loop-arrow {
           font-size: 24px;
-          color: #9ca3af;
+          color: ${COLORS.purple};
         }
 
-        /* RESPONSIVE */
+        /* =====================================================
+           RESPONSIVE
+           ===================================================== */
 
         @media (max-width: 1100px) {
+
           .kpi-grid {
             grid-template-columns: repeat(3, 1fr);
           }
+
         }
 
         @media (max-width: 800px) {
@@ -682,7 +817,9 @@ function DecisionROI() {
 
       `}</style>
 
-      {/* HEADER */}
+      {/* =====================================================
+          HEADER
+          ===================================================== */}
 
       <div className="roi-header">
 
@@ -719,7 +856,9 @@ function DecisionROI() {
 
       </div>
 
-      {/* KPI CARDS */}
+      {/* =====================================================
+          KPI CARDS
+          ===================================================== */}
 
       <div className="kpi-grid">
 
@@ -825,9 +964,13 @@ function DecisionROI() {
 
       </div>
 
-      {/* COST + DELIVERY */}
+      {/* =====================================================
+          EXPECTED VS ACTUAL + DELIVERY
+          ===================================================== */}
 
       <div className="chart-grid">
+
+        {/* COST */}
 
         <div className="chart-card">
 
@@ -859,16 +1002,27 @@ function DecisionROI() {
 
               <CartesianGrid
                 strokeDasharray="3 3"
+                stroke={COLORS.border}
               />
 
-              <XAxis dataKey="name" />
+              <XAxis
+                dataKey="name"
+                stroke={COLORS.secondaryText}
+              />
 
-              <YAxis />
+              <YAxis
+                stroke={COLORS.secondaryText}
+              />
 
               <Tooltip
                 formatter={(value) =>
                   currency(value)
                 }
+                contentStyle={{
+                  backgroundColor: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  color: COLORS.text,
+                }}
               />
 
               <Legend />
@@ -876,6 +1030,8 @@ function DecisionROI() {
               <Bar
                 dataKey="cost"
                 name="Cost"
+                fill={COLORS.purple}
+                radius={[6, 6, 0, 0]}
               />
 
             </BarChart>
@@ -883,6 +1039,8 @@ function DecisionROI() {
           </ResponsiveContainer>
 
         </div>
+
+        {/* DELIVERY */}
 
         <div className="chart-card">
 
@@ -913,9 +1071,16 @@ function DecisionROI() {
 
                 {deliveryData.map(
                   (entry, index) => (
+
                     <Cell
                       key={`cell-${index}`}
+                      fill={
+                        index === 0
+                          ? COLORS.green
+                          : COLORS.red
+                      }
                     />
+
                   )
                 )}
 
@@ -933,9 +1098,13 @@ function DecisionROI() {
 
       </div>
 
-      {/* ACTION + MARKET */}
+      {/* =====================================================
+          ACTION + MARKET
+          ===================================================== */}
 
       <div className="chart-grid">
+
+        {/* ACTION PERFORMANCE */}
 
         <div className="chart-card">
 
@@ -958,25 +1127,35 @@ function DecisionROI() {
 
               <CartesianGrid
                 strokeDasharray="3 3"
+                stroke={COLORS.border}
               />
 
               <XAxis
                 dataKey="action"
+                stroke={COLORS.secondaryText}
               />
 
               <YAxis
                 domain={[0, 100]}
+                stroke={COLORS.secondaryText}
               />
 
               <Tooltip
                 formatter={(value) =>
                   `${number(value).toFixed(1)}%`
                 }
+                contentStyle={{
+                  backgroundColor: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  color: COLORS.text,
+                }}
               />
 
               <Bar
                 dataKey="successRate"
                 name="Success Rate (%)"
+                fill={COLORS.green}
+                radius={[6, 6, 0, 0]}
               />
 
             </BarChart>
@@ -984,6 +1163,8 @@ function DecisionROI() {
           </ResponsiveContainer>
 
         </div>
+
+        {/* MARKET */}
 
         <div className="chart-card">
 
@@ -1006,6 +1187,7 @@ function DecisionROI() {
 
               <CartesianGrid
                 strokeDasharray="3 3"
+                stroke={COLORS.border}
               />
 
               <XAxis
@@ -1013,19 +1195,29 @@ function DecisionROI() {
                 angle={-15}
                 textAnchor="end"
                 height={70}
+                stroke={COLORS.secondaryText}
               />
 
-              <YAxis />
+              <YAxis
+                stroke={COLORS.secondaryText}
+              />
 
               <Tooltip
                 formatter={(value) =>
                   currency(value)
                 }
+                contentStyle={{
+                  backgroundColor: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  color: COLORS.text,
+                }}
               />
 
               <Bar
                 dataKey="savings"
                 name="Savings (₹)"
+                fill={COLORS.purple}
+                radius={[6, 6, 0, 0]}
               />
 
             </BarChart>
@@ -1036,7 +1228,9 @@ function DecisionROI() {
 
       </div>
 
-      {/* MARKET ANALYTICS */}
+      {/* =====================================================
+          MARKET ANALYTICS
+          ===================================================== */}
 
       <div className="chart-card full-chart">
 
@@ -1059,18 +1253,27 @@ function DecisionROI() {
 
             <CartesianGrid
               strokeDasharray="3 3"
+              stroke={COLORS.border}
             />
 
             <XAxis
               dataKey="market"
+              stroke={COLORS.secondaryText}
             />
 
-            <YAxis />
+            <YAxis
+              stroke={COLORS.secondaryText}
+            />
 
             <Tooltip
               formatter={(value) =>
                 currency(value)
               }
+              contentStyle={{
+                backgroundColor: COLORS.card,
+                border: `1px solid ${COLORS.border}`,
+                color: COLORS.text,
+              }}
             />
 
             <Legend />
@@ -1079,7 +1282,15 @@ function DecisionROI() {
               type="monotone"
               dataKey="savings"
               name="Cost Saving (₹)"
+              stroke={COLORS.purple}
               strokeWidth={3}
+              dot={{
+                r: 4,
+                fill: COLORS.purple,
+              }}
+              activeDot={{
+                r: 6,
+              }}
             />
 
           </LineChart>
@@ -1088,7 +1299,9 @@ function DecisionROI() {
 
       </div>
 
-      {/* ROI SUMMARY */}
+      {/* =====================================================
+          ROI SUMMARY
+          ===================================================== */}
 
       <div className="roi-summary">
 
@@ -1158,7 +1371,9 @@ function DecisionROI() {
 
       </div>
 
-      {/* CLOSED LOOP */}
+      {/* =====================================================
+          CLOSED LOOP
+          ===================================================== */}
 
       <div className="closed-loop">
 
