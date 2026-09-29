@@ -10,8 +10,24 @@ import React, {
 // Decision History
 // ============================================================
 
-const API_URL =
-  "http://127.0.0.1:8000/api/outcomes/history";
+const API_URL = "http://127.0.0.1:8000/api/outcomes/api/outcomes/";
+const DECISIONS_API_URL = "http://127.0.0.1:8000/api/decisions/";
+
+// ------------------------------------------------------------
+// Helper functions
+// ------------------------------------------------------------
+
+function firstValue(row, keys, fallback = "") {
+  for (const key of keys) {
+    if (
+      row &&
+      row[key] !== undefined &&
+      row[key] !== null &&
+      row[key] !== ""
+    ) {
+      return row[key];
+    }
+  }
 
 
 // ============================================================
@@ -159,18 +175,12 @@ function getStatus(record) {
 export default function DecisionHistory() {
 
   const [records, setRecords] = useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [search, setSearch] =
-    useState("");
-
-  const [filterStatus, setFilterStatus] =
-    useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [decisions, setDecisions] = useState([]);
+  const [decisionsLoading, setDecisionsLoading] = useState(true);
 
 
   // ==========================================================
@@ -222,6 +232,20 @@ export default function DecisionHistory() {
       setLoading(false);
     }
   };
+    const loadDecisions = async () => {
+    try {
+      setDecisionsLoading(true);
+      const response = await fetch(DECISIONS_API_URL);
+      if (!response.ok) throw new Error("Failed to load decisions");
+      const result = await response.json();
+      setDecisions(Array.isArray(result) ? result : []);
+    } catch (err) {
+      console.error("Failed to load executed decisions:", err);
+      setDecisions([]);
+    } finally {
+      setDecisionsLoading(false);
+    }
+  };
 
 
   // ==========================================================
@@ -229,9 +253,8 @@ export default function DecisionHistory() {
   // ==========================================================
 
   useEffect(() => {
-
-    loadHistory();
-
+    loadOutcomes();
+    loadDecisions();
   }, []);
 
 
@@ -966,6 +989,56 @@ export default function DecisionHistory() {
 
           </div>
 
+        </div>
+        
+        {/* =====================================================
+            EXECUTED DECISIONS
+        ===================================================== */}
+
+        <div className="records-card" style={{ marginBottom: "22px" }}>
+          <div className="records-header">
+            <h2>Executed Decisions</h2>
+            <p>Decisions recorded from the prescription workflow</p>
+          </div>
+
+          {decisionsLoading ? (
+            <div className="loading-box">Loading executed decisions...</div>
+          ) : decisions.length === 0 ? (
+            <div className="empty-box">No decisions executed yet.</div>
+          ) : (
+            <div className="table-wrapper">
+              <table style={{ minWidth: "900px" }}>
+                <thead>
+                  <tr>
+                    <th>Decision ID</th>
+                    <th>Shipment ID</th>
+                    <th>Selected Option</th>
+                    <th>Cost</th>
+                    <th>Executed By</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...decisions]
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .map((d) => (
+                      <tr key={d.id}>
+                        <td><span className="decision-id">DEC-{String(d.id).padStart(4, "0")}</span></td>
+                        <td><span className="shipment-id">{d.shipment_id}</span></td>
+                        <td>{d.selected_option}</td>
+                        <td>{formatCurrency(d.estimated_cost)}</td>
+                        <td>{d.user_name}</td>
+                        <td>
+                          <span className="status-badge status-success">{d.decision_status}</span>
+                        </td>
+                        <td>{formatDate(d.created_at)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
 
