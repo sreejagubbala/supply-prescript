@@ -1,9 +1,5 @@
-# ============================================================
-# SUPPLY PRESCRIPT
-# Backend Entry Point
-# ============================================================
-
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -30,6 +26,11 @@ from .models import (
 
 from scripts.seed_database import seed_database
 
+
+# ============================================================
+# APPLICATION LIFESPAN
+# ============================================================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
@@ -45,6 +46,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
+
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
+
 app = FastAPI(
     title="SupplyPrescript API",
     description="Backend API for SupplyPrescript",
@@ -52,7 +58,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+# ============================================================
+# CORS
+# ============================================================
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -61,33 +76,24 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-app.include_router(
-    shipments.router
-)
 
-app.include_router(
-    database.router
-)
+# ============================================================
+# ROUTERS
+# ============================================================
 
-app.include_router(
-    suppliers.router
-)
+app.include_router(shipments.router)
 
-app.include_router(
-    operations.router
-)
+app.include_router(database.router)
 
-app.include_router(
-    predictions.router
-)
+app.include_router(suppliers.router)
 
-app.include_router(
-    prescriptions.router
-)
+app.include_router(operations.router)
 
-app.include_router(
-    decisions.router
-)
+app.include_router(predictions.router)
+
+app.include_router(prescriptions.router)
+
+app.include_router(decisions.router)
 
 app.include_router(
     outcomes.router,
@@ -99,13 +105,11 @@ app.include_router(
     prefix="/api/roi"
 )
 
-
 @app.get("/")
 def root():
     return {
         "message": "SupplyPrescript Backend is running"
     }
-
 
 @app.get("/health")
 def health():
@@ -113,10 +117,9 @@ def health():
         "status": "healthy"
     }
 
-
-# -------------------------
-# API Information
-# -------------------------
+# ============================================================
+# API INFORMATION
+# ============================================================
 
 @app.get("/api")
 def api_information():

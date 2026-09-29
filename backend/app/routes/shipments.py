@@ -1,18 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from pathlib import Path
+import pandas as pd
 
+from ..schemas.shipment import ShipmentCreate, ShipmentResponse
 from ..database import get_db
 from ..models.shipment import Shipment
-from ..schemas.shipment import (
-    ShipmentCreate,
-    ShipmentResponse
-)
-
 
 router = APIRouter(
     prefix="/api/shipments",
     tags=["Shipments"]
 )
+
+# Common dashboard dataset
+BASE_DIR = Path(__file__).resolve().parents[3]
+OUTCOME_FILE = BASE_DIR / "data" / "processed" / "decision_outcomes.csv"
 
 
 @router.get(
@@ -20,9 +21,8 @@ router = APIRouter(
     response_model=list[ShipmentResponse]
 )
 def get_shipments(
-    db: Session = Depends(get_db)
+    db=Depends(get_db)
 ):
-
     shipments = (
         db.query(Shipment)
         .order_by(Shipment.id)
@@ -46,33 +46,31 @@ def get_shipments(
     "/{shipment_id}",
     response_model=ShipmentResponse
 )
-def get_shipment(
-    shipment_id: int,
-    db: Session = Depends(get_db)
-):
+def get_shipment(shipment_id: int):
 
-    shipment = (
-        db.query(Shipment)
-        .filter(
-            Shipment.id == shipment_id
-        )
-        .first()
-    )
+    df = pd.read_csv(OUTCOME_FILE)
 
-    if shipment is None:
-
+    if shipment_id < 1 or shipment_id > len(df):
         raise HTTPException(
             status_code=404,
             detail="Shipment not found"
         )
 
+    row = df.iloc[shipment_id - 1]
+
+    on_time = str(row["On_Time"]).lower() in ["true", "1", "yes"]
+
+    status = "On Track" if on_time else "At Risk"
+
+    risk_score = float(row["Late_delivery_risk"])
+
     return {
-        "id": shipment.id,
-        "origin": shipment.origin,
-        "destination": shipment.destination,
-        "status": shipment.status,
-        "eta": shipment.eta,
-        "riskScore": shipment.risk_score
+        "id": shipment_id,
+        "origin": str(row["Customer_City"]),
+        "destination": str(row["Order_Region"]),
+        "status": status,
+        "eta": None,
+        "riskScore": risk_score
     }
 
 
@@ -83,7 +81,7 @@ def get_shipment(
 )
 def create_shipment(
     shipment_data: ShipmentCreate,
-    db: Session = Depends(get_db)
+    db = Depends(get_db)
 ):
 
     existing_shipment = (
@@ -96,7 +94,6 @@ def create_shipment(
     )
 
     if existing_shipment:
-
         raise HTTPException(
             status_code=400,
             detail="Shipment code already exists"
@@ -118,9 +115,7 @@ def create_shipment(
     )
 
     db.add(shipment)
-
     db.commit()
-
     db.refresh(shipment)
 
     return {
