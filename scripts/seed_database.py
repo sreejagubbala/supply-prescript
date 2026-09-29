@@ -1,15 +1,23 @@
 from sqlalchemy import text
+
 from backend.app.database import SessionLocal
+
 from backend.app.models import (
     Supplier,
     Shipment,
     Prediction,
-    Prescription
+    Prescription,
+    Decision,
+    Outcome
 )
 
+
 def seed_database():
+
     db = SessionLocal()
+
     try:
+
         # ============================================================
         # SUPPLIERS
         # ============================================================
@@ -19,16 +27,19 @@ def seed_database():
         if supplier_count == 0:
 
             suppliers = [
+
                 Supplier(
                     supplier_name="Alpha Electronics",
                     reliability_score=92.50,
                     location="Delhi"
                 ),
+
                 Supplier(
                     supplier_name="Beta Components",
                     reliability_score=87.00,
                     location="Mumbai"
                 ),
+
                 Supplier(
                     supplier_name="Gamma Industries",
                     reliability_score=95.00,
@@ -39,7 +50,6 @@ def seed_database():
             db.add_all(suppliers)
             db.commit()
 
-        # Get suppliers
         suppliers = (
             db.query(Supplier)
             .order_by(Supplier.id)
@@ -55,11 +65,6 @@ def seed_database():
         # ============================================================
         # SHIPMENTS
         # ============================================================
-
-        # ------------------------------------------------------------
-        # IMPORTANT:
-        # We want shipment database IDs from 1 to 20.
-        # ------------------------------------------------------------
 
         shipments = [
 
@@ -385,33 +390,39 @@ def seed_database():
         ]
 
         # ============================================================
-        # REMOVE OLD SHIPMENTS
+        # CLEAR OLD DATA
         # ============================================================
 
-        # Existing shipments may have IDs 4-23.
-        # Delete their dependent predictions/prescriptions first.
+        # Important:
+        # Delete child records first because of foreign keys.
+
+        db.query(Outcome).delete()
+
+        db.query(Decision).delete()
 
         db.query(Prediction).delete()
+
         db.query(Prescription).delete()
+
         db.query(Shipment).delete()
 
         db.commit()
 
+        print("Old shipment and closed-loop data removed.")
+
         # ============================================================
-        # INSERT SHIPMENTS WITH IDs 1-20
+        # INSERT 20 SHIPMENTS
         # ============================================================
 
         db.add_all(shipments)
+
         db.commit()
 
-        print("Inserted 20 shipments with IDs 1-20.")
+        print("Inserted 20 shipments.")
 
         # ============================================================
-        # RESET POSTGRES SEQUENCE
+        # RESET SHIPMENT ID SEQUENCE
         # ============================================================
-
-        # Make sure the next automatically generated shipment ID
-        # becomes 21.
 
         db.execute(
             text(
@@ -422,13 +433,13 @@ def seed_database():
                     true
                 )
                 """
-           )
+            )
         )
 
         db.commit()
 
         # ============================================================
-        # PREDICTIONS
+        # PREDICTIONS FOR ALL 20 SHIPMENTS
         # ============================================================
 
         predictions = [
@@ -452,58 +463,467 @@ def seed_database():
                 delay_probability=76,
                 predicted_delay_days=10,
                 model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=4,
+                delay_probability=15,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=5,
+                delay_probability=85,
+                predicted_delay_days=7,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=6,
+                delay_probability=20,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=7,
+                delay_probability=8,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=8,
+                delay_probability=91,
+                predicted_delay_days=12,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=9,
+                delay_probability=25,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=10,
+                delay_probability=55,
+                predicted_delay_days=6,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=11,
+                delay_probability=18,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=12,
+                delay_probability=10,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=13,
+                delay_probability=22,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=14,
+                delay_probability=72,
+                predicted_delay_days=9,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=15,
+                delay_probability=5,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=16,
+                delay_probability=60,
+                predicted_delay_days=7,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=17,
+                delay_probability=14,
+                predicted_delay_days=1,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=18,
+                delay_probability=88,
+                predicted_delay_days=11,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=19,
+                delay_probability=30,
+                predicted_delay_days=2,
+                model_name="XGBoost"
+            ),
+
+            Prediction(
+                shipment_id=20,
+                delay_probability=95,
+                predicted_delay_days=13,
+                model_name="XGBoost"
             )
         ]
 
         db.add_all(predictions)
+
         db.commit()
 
+        print("Inserted 20 predictions.")
+
         # ============================================================
-        # PRESCRIPTIONS
+        # PRESCRIPTIONS FOR ALL 20 SHIPMENTS
         # ============================================================
 
-        prescriptions = [
+        prescription_data = [
 
-            Prescription(
-                shipment_id=1,
-                option_name="Air Freight",
-                description="Use air freight for faster delivery",
-                estimated_cost=15000,
-                delivery_days=3,
-                risk_score=10,
-                recommendation_rank=1
-            ),
+            ("Air Freight", "Use air freight for faster delivery",
+             15000, 3, 10),
 
-            Prescription(
-                shipment_id=1,
-                option_name="Secondary Supplier",
-                description="Purchase from an alternate supplier",
-                estimated_cost=16500,
-                delivery_days=5,
-                risk_score=20,
-                recommendation_rank=2
-            ),
+            ("Standard Transport", "Continue with standard transportation",
+             9000, 2, 12),
 
-            Prescription(
-                shipment_id=1,
-                option_name="Delay Product Launch",
-                description="Delay final product launch",
-                estimated_cost=5000,
-                delivery_days=14,
-                risk_score=60,
-                recommendation_rank=3
-            )
+            ("Air Freight", "Use air freight to reduce delay risk",
+             18000, 4, 15),
+
+            ("Standard Transport", "Continue with standard transportation",
+             8000, 2, 15),
+
+            ("Air Freight", "Use air freight to handle high delay risk",
+             14500, 4, 12),
+
+            ("Standard Transport", "Use standard transport for stable shipment",
+             9500, 2, 20),
+
+            ("Standard Transport", "Continue with normal transportation",
+             8500, 2, 8),
+
+            ("Air Freight", "Use air freight for high-risk shipment",
+             19000, 4, 10),
+
+            ("Standard Transport", "Continue with standard transportation",
+             8200, 2, 25),
+
+            ("Secondary Supplier", "Use an alternate supplier to reduce delay",
+             12500, 5, 30),
+
+            ("Standard Transport", "Continue with standard transportation",
+             9000, 2, 18),
+
+            ("Standard Transport", "Continue with normal transportation",
+             8800, 2, 10),
+
+            ("Standard Transport", "Continue with normal transportation",
+             7600, 2, 22),
+
+            ("Air Freight", "Use air freight to reduce high delay risk",
+             15500, 4, 15),
+
+            ("Standard Transport", "Continue with normal transportation",
+             9500, 2, 5),
+
+            ("Secondary Supplier", "Use alternate supplier to reduce delay",
+             12000, 5, 35),
+
+            ("Standard Transport", "Continue with normal transportation",
+             9200, 2, 14),
+
+            ("Air Freight", "Use air freight for high-risk shipment",
+             16000, 4, 12),
+
+            ("Standard Transport", "Continue with normal transportation",
+             8700, 2, 30),
+
+            ("Air Freight", "Use air freight for extremely high-risk shipment",
+             17000, 4, 10)
         ]
 
+        prescriptions = []
+
+        for index, data in enumerate(
+            prescription_data,
+            start=1
+        ):
+
+            option_name = data[0]
+            description = data[1]
+            estimated_cost = data[2]
+            delivery_days = data[3]
+            risk_score = data[4]
+
+            prescription = Prescription(
+
+                shipment_id=index,
+
+                option_name=option_name,
+
+                description=description,
+
+                estimated_cost=estimated_cost,
+
+                delivery_days=delivery_days,
+
+                risk_score=risk_score,
+
+                recommendation_rank=1
+            )
+
+            prescriptions.append(prescription)
+
         db.add_all(prescriptions)
+
         db.commit()
+
+        for prescription in prescriptions:
+            db.refresh(prescription)
+
+        print("Inserted 20 prescriptions.")
+
+        # ============================================================
+        # DECISIONS FOR ALL 20 SHIPMENTS
+        # ============================================================
+
+        decisions = []
+
+        for index, prescription in enumerate(
+            prescriptions,
+            start=1
+        ):
+
+            decision = Decision(
+
+                shipment_id=index,
+
+                prescription_id=prescription.id,
+
+                selected_option=prescription.option_name,
+
+                estimated_cost=prescription.estimated_cost,
+
+                user_name="Manager",
+
+                decision_status="Executed"
+            )
+
+            decisions.append(decision)
+
+        db.add_all(decisions)
+
+        db.commit()
+
+        for decision in decisions:
+            db.refresh(decision)
+
+        print("Inserted 20 decisions.")
+
+        # ============================================================
+        # OUTCOMES FOR ALL 20 DECISIONS
+        # ============================================================
+
+        outcomes = []
+
+        # Actual delivery days and actual cost are intentionally
+        # varied so the Decision History page demonstrates:
+        #
+        # - Successful decisions
+        # - Delayed decisions
+        # - Cost savings
+        # - Negative savings
+        # - On-time deliveries
+        # - Late deliveries
+
+        actual_delivery_days = [
+
+            3,   # Shipment 1
+            2,   # Shipment 2
+            5,   # Shipment 3
+            2,   # Shipment 4
+            6,   # Shipment 5
+            2,   # Shipment 6
+            2,   # Shipment 7
+            6,   # Shipment 8
+            2,   # Shipment 9
+            7,   # Shipment 10
+            2,   # Shipment 11
+            2,   # Shipment 12
+            2,   # Shipment 13
+            6,   # Shipment 14
+            2,   # Shipment 15
+            7,   # Shipment 16
+            2,   # Shipment 17
+            6,   # Shipment 18
+            2,   # Shipment 19
+            7    # Shipment 20
+        ]
+
+        actual_costs = [
+
+            14000,   # Shipment 1
+            8500,    # Shipment 2
+            17500,   # Shipment 3
+            7600,    # Shipment 4
+            15000,   # Shipment 5
+            9000,    # Shipment 6
+            8000,    # Shipment 7
+            18500,   # Shipment 8
+            7900,    # Shipment 9
+            13000,   # Shipment 10
+            8500,    # Shipment 11
+            8200,    # Shipment 12
+            7400,    # Shipment 13
+            16000,   # Shipment 14
+            9000,    # Shipment 15
+            12500,   # Shipment 16
+            8800,    # Shipment 17
+            16500,   # Shipment 18
+            8300,    # Shipment 19
+            18000    # Shipment 20
+        ]
+
+        outcome_statuses = [
+
+            "Successful",
+            "Successful",
+            "Successful",
+            "Successful",
+            "Delayed",
+            "Successful",
+            "Successful",
+            "Delayed",
+            "Successful",
+            "Delayed",
+            "Successful",
+            "Successful",
+            "Successful",
+            "Delayed",
+            "Successful",
+            "Delayed",
+            "Successful",
+            "Delayed",
+            "Successful",
+            "Delayed"
+        ]
+
+        outcome_notes = [
+
+            "Air freight delivered on time and below estimated cost.",
+
+            "Standard transport delivered on time with cost savings.",
+
+            "Air freight reduced the expected delivery delay.",
+
+            "Shipment delivered on schedule.",
+
+            "Shipment arrived later than expected.",
+
+            "Shipment delivered successfully within expected time.",
+
+            "Shipment delivered on time with low risk.",
+
+            "High-risk shipment experienced a delivery delay.",
+
+            "Shipment delivered successfully.",
+
+            "Shipment experienced a moderate delivery delay.",
+
+            "Shipment delivered successfully with cost savings.",
+
+            "Shipment delivered on time.",
+
+            "Shipment delivered successfully.",
+
+            "Shipment arrived later than expected.",
+
+            "Shipment delivered on time with low risk.",
+
+            "Alternate supplier decision still experienced a delay.",
+
+            "Shipment delivered successfully.",
+
+            "High-risk shipment experienced a delivery delay.",
+
+            "Shipment delivered successfully.",
+
+            "High-risk shipment experienced a delivery delay."
+        ]
+
+        for index, decision in enumerate(
+            decisions
+        ):
+
+            outcome = Outcome(
+
+                decision_id=decision.id,
+
+                actual_cost=actual_costs[index],
+
+                actual_delivery_days=actual_delivery_days[index],
+
+                outcome_status=outcome_statuses[index],
+
+                notes=outcome_notes[index]
+            )
+
+            outcomes.append(outcome)
+
+        db.add_all(outcomes)
+
+        db.commit()
+
+        print("Inserted 20 outcomes.")
 
         # ============================================================
         # COMPLETE
         # ============================================================
 
-        print("Sample database data is ready.")
-        print("Shipment IDs: 1 to 20")
+        print("")
+        print("================================================")
+        print("SAMPLE DATABASE DATA IS READY")
+        print("================================================")
+        print("Suppliers      : 3")
+        print("Shipments      : 20")
+        print("Predictions    : 20")
+        print("Prescriptions  : 20")
+        print("Decisions      : 20")
+        print("Outcomes       : 20")
+        print("================================================")
+        print("Closed-loop data is ready.")
+        print("Decision History should show 20 records.")
+        print("================================================")
+
+
+    except Exception as error:
+
+        db.rollback()
+
+        print("")
+        print("================================================")
+        print("DATABASE SEED ERROR")
+        print("================================================")
+        print(error)
+        print("================================================")
+
+        raise
 
     finally:
 
@@ -511,4 +931,5 @@ def seed_database():
 
 
 if __name__ == "__main__":
+
     seed_database()
