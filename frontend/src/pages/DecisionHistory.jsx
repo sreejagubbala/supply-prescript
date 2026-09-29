@@ -1,4 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 // ============================================================
 // SUPPLY PRESCRIPT
@@ -870,6 +882,60 @@ export default function DecisionHistory() {
             </div>
           </div>
 
+        </div>
+        
+                {/* =====================================================
+            PREDICTED VS ACTUAL CHARTS
+        ===================================================== */}
+
+        <div className="records-card" style={{ marginBottom: "22px", padding: "20px" }}>
+          <div className="records-header" style={{ padding: "0 0 20px 0", border: "none" }}>
+            <h2>Predicted vs Actual Performance</h2>
+            <p>Comparing expected outcomes against what actually happened, per decision</p>
+          </div>
+
+          {filteredRecords.length === 0 ? (
+            <div className="empty-box">No outcome data yet to chart.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px" }}>
+              <div>
+                <p style={{ color: "#8eb1d5", fontSize: "13px", marginBottom: "10px" }}>
+                  Delivery Days (Expected vs Actual)
+                </p>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={filteredRecords.slice(0, 10)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#292929" />
+                    <XAxis dataKey="decisionId" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
+                    <YAxis stroke="#8eb1d5" />
+                    <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #292929" }} />
+                    <Legend />
+                    <Bar dataKey="expectedDelivery" name="Expected Days" fill="#60a5fa" />
+                    <Bar dataKey="actualDelivery" name="Actual Days" fill="#c084fc" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div>
+                <p style={{ color: "#8eb1d5", fontSize: "13px", marginBottom: "10px" }}>
+                  Cost (Expected vs Actual)
+                </p>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={filteredRecords.slice(0, 10)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#292929" />
+                    <XAxis dataKey="decisionId" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
+                    <YAxis stroke="#8eb1d5" />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "#111", border: "1px solid #292929" }}
+                      formatter={(value) => formatCurrency(value)}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="expectedCost" name="Expected Cost" stroke="#60a5fa" strokeWidth={2} />
+                    <Line type="monotone" dataKey="actualCost" name="Actual Cost" stroke="#c084fc" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* =====================================================
