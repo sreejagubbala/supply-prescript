@@ -21,10 +21,8 @@ from .models import (
     Prediction,
     Prescription,
     Decision,
-    Outcome
+    Outcome,
 )
-
-from scripts.seed_database import seed_database
 
 
 # ============================================================
@@ -34,17 +32,28 @@ from scripts.seed_database import seed_database
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
+    print("=" * 60)
+    print("SUPPLY PRESCRIPT BACKEND")
+    print("=" * 60)
+
     print("Creating database tables...")
 
     Base.metadata.create_all(
         bind=engine
     )
 
-    seed_database()
+    print("Database tables ready.")
+    print("=" * 60)
 
-    print("Database tables and sample data ready.")
+    # IMPORTANT:
+    # DO NOT call seed_database() here.
+    #
+    # Seeding here would delete Decisions and Outcomes
+    # every time FastAPI restarts.
 
     yield
+
+    print("SupplyPrescript backend shutting down...")
 
 
 # ============================================================
@@ -53,9 +62,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="SupplyPrescript API",
-    description="Backend API for SupplyPrescript",
+    description=(
+        "Backend API for SupplyPrescript"
+    ),
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
@@ -65,15 +76,16 @@ app = FastAPI(
 
 origins = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
 ]
+
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 
@@ -81,41 +93,85 @@ app.add_middleware(
 # ROUTERS
 # ============================================================
 
-app.include_router(shipments.router)
+app.include_router(
+    shipments.router
+)
 
-app.include_router(database.router)
+app.include_router(
+    database.router
+)
 
-app.include_router(suppliers.router)
+app.include_router(
+    suppliers.router
+)
 
-app.include_router(operations.router)
+app.include_router(
+    operations.router
+)
 
-app.include_router(predictions.router)
+app.include_router(
+    predictions.router
+)
 
-app.include_router(prescriptions.router)
+app.include_router(
+    prescriptions.router
+)
 
-app.include_router(decisions.router)
+
+# ============================================================
+# DECISIONS
+# ============================================================
+
+app.include_router(
+    decisions.router,
+    prefix="/api/decisions",
+)
+
+
+# ============================================================
+# OUTCOMES
+# ============================================================
 
 app.include_router(
     outcomes.router,
-    prefix="/api/outcomes"
+    prefix="/api/outcomes",
 )
+
+
+# ============================================================
+# ROI
+# ============================================================
 
 app.include_router(
     roi.router,
-    prefix="/api/roi"
+    prefix="/api/roi",
 )
+
+
+# ============================================================
+# ROOT
+# ============================================================
 
 @app.get("/")
 def root():
+
     return {
-        "message": "SupplyPrescript Backend is running"
+        "message":
+            "SupplyPrescript Backend is running"
     }
+
+
+# ============================================================
+# HEALTH
+# ============================================================
 
 @app.get("/health")
 def health():
+
     return {
         "status": "healthy"
     }
+
 
 # ============================================================
 # API INFORMATION
@@ -123,18 +179,45 @@ def health():
 
 @app.get("/api")
 def api_information():
+
     return {
-        "project": "SupplyPrescript",
-        "module": "Backend + Closed-Loop Analytics",
+
+        "project":
+            "SupplyPrescript",
+
+        "module":
+            "Backend + Closed-Loop Analytics",
+
         "endpoints": {
-            "shipments": "/shipments",
-            "database": "/database",
-            "suppliers": "/suppliers",
-            "operations": "/operations",
-            "predictions": "/predictions",
-            "decisions": "/decisions",
-            "prescriptions": "/prescriptions",
-            "outcomes": "/api/outcomes",
-            "roi": "/api/roi"
-        }
+
+            "shipments":
+                "/shipments",
+
+            "database":
+                "/database",
+
+            "suppliers":
+                "/suppliers",
+
+            "operations":
+                "/operations",
+
+            "predictions":
+                "/predictions",
+
+            "prescriptions":
+                "/prescriptions",
+
+            "decisions":
+                "/api/decisions",
+
+            "outcomes":
+                "/api/outcomes",
+
+            "decision_history":
+                "/api/outcomes/history",
+
+            "roi":
+                "/api/roi",
+        },
     }

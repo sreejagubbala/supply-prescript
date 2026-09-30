@@ -1,16 +1,323 @@
+from datetime import date
+from pathlib import Path
+import sys
+
 from sqlalchemy import text
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.app.database import SessionLocal
 
-from backend.app.models import (
-    Supplier,
-    Shipment,
-    Prediction,
-    Prescription,
-    Decision,
-    Outcome
-)
+from backend.app.models.supplier import Supplier
+from backend.app.models.shipment import Shipment
+from backend.app.models.prediction import Prediction
+from backend.app.models.prescription import Prescription
+from backend.app.models.decision import Decision
+from backend.app.models.outcome import Outcome
 
+SUPPLIERS = [
+    {
+        "supplier_name": "Alpha Electronics",
+        "reliability_score": 92.50,
+        "location": "Delhi",
+    },
+    {
+        "supplier_name": "Beta Components",
+        "reliability_score": 87.00,
+        "location": "Mumbai",
+    },
+    {
+        "supplier_name": "Gamma Industries",
+        "reliability_score": 95.00,
+        "location": "Bangalore",
+    },
+]
+
+SHIPMENTS = [
+    {
+        "shipment_code": "SHP001",
+        "product": "Microchips",
+        "quantity": 5000,
+        "historical_lead_time": 7,
+        "current_lead_time": 10,
+        "inventory_level": 8500,
+        "status": "Delayed",
+        "origin": "Delhi",
+        "destination": "Mumbai",
+        "eta": date(2026, 9, 15),
+        "risk_score": 87,
+        "supplier_index": 0,
+    },
+    {
+        "shipment_code": "SHP002",
+        "product": "Processors",
+        "quantity": 3000,
+        "historical_lead_time": 6,
+        "current_lead_time": 6,
+        "inventory_level": 6200,
+        "status": "On-Time",
+        "origin": "Mumbai",
+        "destination": "Bangalore",
+        "eta": date(2026, 9, 12),
+        "risk_score": 12,
+        "supplier_index": 1,
+    },
+    {
+        "shipment_code": "SHP003",
+        "product": "Memory Modules",
+        "quantity": 7000,
+        "historical_lead_time": 8,
+        "current_lead_time": 11,
+        "inventory_level": 9200,
+        "status": "Delayed",
+        "origin": "Bangalore",
+        "destination": "Delhi",
+        "eta": date(2026, 9, 18),
+        "risk_score": 76,
+        "supplier_index": 2,
+    },
+    {
+        "shipment_code": "SHP004",
+        "product": "Microcontrollers",
+        "quantity": 2500,
+        "historical_lead_time": 5,
+        "current_lead_time": 5,
+        "inventory_level": 5000,
+        "status": "On-Time",
+        "origin": "Kolkata",
+        "destination": "Chennai",
+        "eta": date(2026, 9, 20),
+        "risk_score": 15,
+        "supplier_index": 0,
+    },
+    {
+        "shipment_code": "SHP005",
+        "product": "Sensors",
+        "quantity": 4000,
+        "historical_lead_time": 7,
+        "current_lead_time": 10,
+        "inventory_level": 7000,
+        "status": "Delayed",
+        "origin": "Delhi",
+        "destination": "Mumbai",
+        "eta": date(2026, 9, 21),
+        "risk_score": 85,
+        "supplier_index": 1,
+    },
+    {
+        "shipment_code": "SHP006",
+        "product": "Circuit Boards",
+        "quantity": 3200,
+        "historical_lead_time": 6,
+        "current_lead_time": 6,
+        "inventory_level": 6500,
+        "status": "On-Time",
+        "origin": "Pune",
+        "destination": "Bengaluru",
+        "eta": date(2026, 9, 22),
+        "risk_score": 20,
+        "supplier_index": 2,
+    },
+    {
+        "shipment_code": "SHP007",
+        "product": "Connectors",
+        "quantity": 5200,
+        "historical_lead_time": 5,
+        "current_lead_time": 5,
+        "inventory_level": 8000,
+        "status": "On-Time",
+        "origin": "Chennai",
+        "destination": "Hyderabad",
+        "eta": date(2026, 9, 23),
+        "risk_score": 8,
+        "supplier_index": 0,
+    },
+    {
+        "shipment_code": "SHP008",
+        "product": "Processors",
+        "quantity": 6500,
+        "historical_lead_time": 8,
+        "current_lead_time": 12,
+        "inventory_level": 11000,
+        "status": "Delayed",
+        "origin": "Bengaluru",
+        "destination": "Delhi",
+        "eta": date(2026, 9, 24),
+        "risk_score": 91,
+        "supplier_index": 1,
+    },
+    {
+        "shipment_code": "SHP009",
+        "product": "Memory Chips",
+        "quantity": 2800,
+        "historical_lead_time": 6,
+        "current_lead_time": 6,
+        "inventory_level": 5500,
+        "status": "On-Time",
+        "origin": "Mumbai",
+        "destination": "Pune",
+        "eta": date(2026, 9, 25),
+        "risk_score": 25,
+        "supplier_index": 2,
+    },
+    {
+        "shipment_code": "SHP010",
+        "product": "Display Modules",
+        "quantity": 4500,
+        "historical_lead_time": 7,
+        "current_lead_time": 9,
+        "inventory_level": 7500,
+        "status": "Delayed",
+        "origin": "Delhi",
+        "destination": "Kolkata",
+        "eta": date(2026, 9, 26),
+        "risk_score": 55,
+        "supplier_index": 0,
+    },
+    {
+        "shipment_code": "SHP011",
+        "product": "Power Units",
+        "quantity": 3500,
+        "historical_lead_time": 6,
+        "current_lead_time": 6,
+        "inventory_level": 7000,
+        "status": "On-Time",
+        "origin": "Pune",
+        "destination": "Mumbai",
+        "eta": date(2026, 9, 27),
+        "risk_score": 18,
+        "supplier_index": 1,
+    },
+    {
+        "shipment_code": "SHP012",
+        "product": "Control Boards",
+        "quantity": 3000,
+        "historical_lead_time": 5,
+        "current_lead_time": 5,
+        "inventory_level": 6000,
+        "status": "On-Time",
+        "origin": "Bengaluru",
+        "destination": "Chennai",
+        "eta": date(2026, 9, 28),
+        "risk_score": 10,
+        "supplier_index": 2,
+    },
+    {
+        "shipment_code": "SHP013",
+        "product": "Capacitors",
+        "quantity": 2200,
+        "historical_lead_time": 6,
+        "current_lead_time": 6,
+        "inventory_level": 4500,
+        "status": "On-Time",
+        "origin": "Ahmedabad",
+        "destination": "Surat",
+        "eta": date(2026, 9, 29),
+        "risk_score": 22,
+        "supplier_index": 0,
+    },
+    {
+        "shipment_code": "SHP014",
+        "product": "Resistors",
+        "quantity": 4100,
+        "historical_lead_time": 7,
+        "current_lead_time": 10,
+        "inventory_level": 8000,
+        "status": "Delayed",
+        "origin": "Jaipur",
+        "destination": "Delhi",
+        "eta": date(2026, 9, 30),
+        "risk_score": 72,
+        "supplier_index": 1,
+    },
+    {
+        "shipment_code": "SHP015",
+        "product": "LED Modules",
+        "quantity": 5500,
+        "historical_lead_time": 5,
+        "current_lead_time": 5,
+        "inventory_level": 9000,
+        "status": "On-Time",
+        "origin": "Chennai",
+        "destination": "Coimbatore",
+        "eta": date(2026, 10, 1),
+        "risk_score": 5,
+        "supplier_index": 2,
+    },
+    {
+        "shipment_code": "SHP016",
+        "product": "Battery Packs",
+        "quantity": 2800,
+        "historical_lead_time": 6,
+        "current_lead_time": 8,
+        "inventory_level": 5500,
+        "status": "Delayed",
+        "origin": "Lucknow",
+        "destination": "Kanpur",
+        "eta": date(2026, 10, 2),
+        "risk_score": 60,
+        "supplier_index": 0,
+    },
+    {
+        "shipment_code": "SHP017",
+        "product": "Power Controllers",
+        "quantity": 6200,
+        "historical_lead_time": 5,
+        "current_lead_time": 5,
+        "inventory_level": 10000,
+        "status": "On-Time",
+        "origin": "Bengaluru",
+        "destination": "Mysuru",
+        "eta": date(2026, 10, 3),
+        "risk_score": 14,
+        "supplier_index": 1,
+    },
+    {
+        "shipment_code": "SHP018",
+        "product": "Communication Modules",
+        "quantity": 2600,
+        "historical_lead_time": 7,
+        "current_lead_time": 10,
+        "inventory_level": 5200,
+        "status": "Delayed",
+        "origin": "Mumbai",
+        "destination": "Nagpur",
+        "eta": date(2026, 10, 4),
+        "risk_score": 88,
+        "supplier_index": 2,
+    },
+    {
+        "shipment_code": "SHP019",
+        "product": "Memory Modules",
+        "quantity": 3900,
+        "historical_lead_time": 6,
+        "current_lead_time": 6,
+        "inventory_level": 7800,
+        "status": "On-Time",
+        "origin": "Kolkata",
+        "destination": "Bhubaneswar",
+        "eta": date(2026, 10, 5),
+        "risk_score": 30,
+        "supplier_index": 0,
+    },
+    {
+        "shipment_code": "SHP020",
+        "product": "Microchips",
+        "quantity": 4800,
+        "historical_lead_time": 7,
+        "current_lead_time": 11,
+        "inventory_level": 8500,
+        "status": "Delayed",
+        "origin": "Delhi",
+        "destination": "Chandigarh",
+        "eta": date(2026, 10, 6),
+        "risk_score": 95,
+        "supplier_index": 1,
+    },
+]
 
 def seed_database():
 
@@ -18,910 +325,377 @@ def seed_database():
 
     try:
 
-        # ============================================================
+        print("=" * 60)
+        print("SUPPLY PRESCRIPT DATABASE SEED")
+        print("=" * 60)
+
+        # ----------------------------------------------------
         # SUPPLIERS
-        # ============================================================
+        # ----------------------------------------------------
 
-        supplier_count = db.query(Supplier).count()
+        suppliers = []
 
-        if supplier_count == 0:
+        for supplier_data in SUPPLIERS:
 
-            suppliers = [
-
-                Supplier(
-                    supplier_name="Alpha Electronics",
-                    reliability_score=92.50,
-                    location="Delhi"
-                ),
-
-                Supplier(
-                    supplier_name="Beta Components",
-                    reliability_score=87.00,
-                    location="Mumbai"
-                ),
-
-                Supplier(
-                    supplier_name="Gamma Industries",
-                    reliability_score=95.00,
-                    location="Bangalore"
+            supplier = (
+                db.query(Supplier)
+                .filter(
+                    Supplier.supplier_name
+                    == supplier_data["supplier_name"]
                 )
-            ]
+                .first()
+            )
 
-            db.add_all(suppliers)
-            db.commit()
+            if supplier is None:
 
-        suppliers = (
-            db.query(Supplier)
-            .order_by(Supplier.id)
-            .all()
+                supplier = Supplier(
+                    supplier_name=supplier_data["supplier_name"],
+                    reliability_score=supplier_data["reliability_score"],
+                    location=supplier_data["location"],
+                )
+
+                db.add(supplier)
+                db.flush()
+
+            else:
+
+                supplier.reliability_score = (
+                    supplier_data["reliability_score"]
+                )
+
+                supplier.location = (
+                    supplier_data["location"]
+                )
+
+            suppliers.append(supplier)
+
+        db.commit()
+
+        print(f"Suppliers ready: {len(suppliers)}")
+
+        # ----------------------------------------------------
+        # DELETE OLD CLOSED-LOOP DATA
+        #
+        # Important:
+        # Outcomes -> Decisions -> Predictions ->
+        # Prescriptions -> Shipments
+        # ----------------------------------------------------
+
+        deleted_outcomes = (
+            db.query(Outcome)
+            .delete(synchronize_session=False)
         )
 
-        if len(suppliers) < 3:
+        db.commit()
 
-            raise Exception(
-                "At least 3 suppliers are required before creating shipments."
-            )
+        print(
+            f"Old outcomes deleted: "
+            f"{deleted_outcomes}"
+        )
 
-        # ============================================================
-        # SHIPMENTS
-        # ============================================================
-
-        shipments = [
-
-            Shipment(
-                id=1,
-                shipment_code="SHP001",
-                product="Microchips",
-                supplier_id=suppliers[0].id,
-                quantity=5000,
-                historical_lead_time=7,
-                current_lead_time=21,
-                inventory_level=2000,
-                status="Delayed",
-                origin="Delhi",
-                destination="Mumbai",
-                eta="2026-09-15",
-                risk_score=87
-            ),
-
-            Shipment(
-                id=2,
-                shipment_code="SHP002",
-                product="Processors",
-                supplier_id=suppliers[1].id,
-                quantity=3000,
-                historical_lead_time=5,
-                current_lead_time=6,
-                inventory_level=4000,
-                status="On-Time",
-                origin="Mumbai",
-                destination="Bangalore",
-                eta="2026-09-12",
-                risk_score=12
-            ),
-
-            Shipment(
-                id=3,
-                shipment_code="SHP003",
-                product="Memory Modules",
-                supplier_id=suppliers[2].id,
-                quantity=7000,
-                historical_lead_time=8,
-                current_lead_time=18,
-                inventory_level=1500,
-                status="Delayed",
-                origin="Bangalore",
-                destination="Delhi",
-                eta="2026-09-18",
-                risk_score=76
-            ),
-
-            Shipment(
-                id=4,
-                shipment_code="SHP004",
-                product="Sensors",
-                supplier_id=suppliers[0].id,
-                quantity=2500,
-                historical_lead_time=6,
-                current_lead_time=7,
-                inventory_level=3500,
-                status="On-Time",
-                origin="Kolkata",
-                destination="Chennai",
-                eta="2026-09-20",
-                risk_score=15
-            ),
-
-            Shipment(
-                id=5,
-                shipment_code="SHP005",
-                product="Controllers",
-                supplier_id=suppliers[1].id,
-                quantity=4000,
-                historical_lead_time=5,
-                current_lead_time=12,
-                inventory_level=1800,
-                status="Delayed",
-                origin="Delhi",
-                destination="Mumbai",
-                eta="2026-09-21",
-                risk_score=85
-            ),
-
-            Shipment(
-                id=6,
-                shipment_code="SHP006",
-                product="Processors",
-                supplier_id=suppliers[2].id,
-                quantity=3200,
-                historical_lead_time=6,
-                current_lead_time=7,
-                inventory_level=4200,
-                status="On-Time",
-                origin="Pune",
-                destination="Bengaluru",
-                eta="2026-09-22",
-                risk_score=20
-            ),
-
-            Shipment(
-                id=7,
-                shipment_code="SHP007",
-                product="Microchips",
-                supplier_id=suppliers[0].id,
-                quantity=5200,
-                historical_lead_time=7,
-                current_lead_time=8,
-                inventory_level=3000,
-                status="On-Time",
-                origin="Chennai",
-                destination="Hyderabad",
-                eta="2026-09-23",
-                risk_score=8
-            ),
-
-            Shipment(
-                id=8,
-                shipment_code="SHP008",
-                product="Memory Modules",
-                supplier_id=suppliers[1].id,
-                quantity=6500,
-                historical_lead_time=8,
-                current_lead_time=20,
-                inventory_level=1200,
-                status="Delayed",
-                origin="Bengaluru",
-                destination="Delhi",
-                eta="2026-09-24",
-                risk_score=91
-            ),
-
-            Shipment(
-                id=9,
-                shipment_code="SHP009",
-                product="Sensors",
-                supplier_id=suppliers[2].id,
-                quantity=2800,
-                historical_lead_time=5,
-                current_lead_time=6,
-                inventory_level=3600,
-                status="On-Time",
-                origin="Mumbai",
-                destination="Pune",
-                eta="2026-09-25",
-                risk_score=25
-            ),
-
-            Shipment(
-                id=10,
-                shipment_code="SHP010",
-                product="Controllers",
-                supplier_id=suppliers[0].id,
-                quantity=4500,
-                historical_lead_time=7,
-                current_lead_time=13,
-                inventory_level=1900,
-                status="Delayed",
-                origin="Delhi",
-                destination="Kolkata",
-                eta="2026-09-26",
-                risk_score=55
-            ),
-
-            Shipment(
-                id=11,
-                shipment_code="SHP011",
-                product="Microchips",
-                supplier_id=suppliers[1].id,
-                quantity=3500,
-                historical_lead_time=6,
-                current_lead_time=7,
-                inventory_level=4000,
-                status="On-Time",
-                origin="Pune",
-                destination="Mumbai",
-                eta="2026-09-27",
-                risk_score=18
-            ),
-
-            Shipment(
-                id=12,
-                shipment_code="SHP012",
-                product="Processors",
-                supplier_id=suppliers[2].id,
-                quantity=3000,
-                historical_lead_time=5,
-                current_lead_time=6,
-                inventory_level=4500,
-                status="On-Time",
-                origin="Bengaluru",
-                destination="Chennai",
-                eta="2026-09-28",
-                risk_score=10
-            ),
-
-            Shipment(
-                id=13,
-                shipment_code="SHP013",
-                product="Sensors",
-                supplier_id=suppliers[0].id,
-                quantity=2200,
-                historical_lead_time=5,
-                current_lead_time=6,
-                inventory_level=3200,
-                status="On-Time",
-                origin="Ahmedabad",
-                destination="Surat",
-                eta="2026-09-29",
-                risk_score=22
-            ),
-
-            Shipment(
-                id=14,
-                shipment_code="SHP014",
-                product="Controllers",
-                supplier_id=suppliers[1].id,
-                quantity=4100,
-                historical_lead_time=6,
-                current_lead_time=15,
-                inventory_level=1600,
-                status="Delayed",
-                origin="Jaipur",
-                destination="Delhi",
-                eta="2026-09-30",
-                risk_score=72
-            ),
-
-            Shipment(
-                id=15,
-                shipment_code="SHP015",
-                product="Microchips",
-                supplier_id=suppliers[2].id,
-                quantity=5500,
-                historical_lead_time=7,
-                current_lead_time=7,
-                inventory_level=5000,
-                status="On-Time",
-                origin="Chennai",
-                destination="Coimbatore",
-                eta="2026-10-01",
-                risk_score=5
-            ),
-
-            Shipment(
-                id=16,
-                shipment_code="SHP016",
-                product="Processors",
-                supplier_id=suppliers[0].id,
-                quantity=2800,
-                historical_lead_time=6,
-                current_lead_time=14,
-                inventory_level=1700,
-                status="Delayed",
-                origin="Lucknow",
-                destination="Kanpur",
-                eta="2026-10-02",
-                risk_score=60
-            ),
-
-            Shipment(
-                id=17,
-                shipment_code="SHP017",
-                product="Memory Modules",
-                supplier_id=suppliers[1].id,
-                quantity=6200,
-                historical_lead_time=8,
-                current_lead_time=8,
-                inventory_level=4000,
-                status="On-Time",
-                origin="Bengaluru",
-                destination="Mysuru",
-                eta="2026-10-03",
-                risk_score=14
-            ),
-
-            Shipment(
-                id=18,
-                shipment_code="SHP018",
-                product="Sensors",
-                supplier_id=suppliers[2].id,
-                quantity=2600,
-                historical_lead_time=5,
-                current_lead_time=16,
-                inventory_level=1400,
-                status="Delayed",
-                origin="Mumbai",
-                destination="Nagpur",
-                eta="2026-10-04",
-                risk_score=88
-            ),
-
-            Shipment(
-                id=19,
-                shipment_code="SHP019",
-                product="Controllers",
-                supplier_id=suppliers[0].id,
-                quantity=3900,
-                historical_lead_time=6,
-                current_lead_time=7,
-                inventory_level=3800,
-                status="On-Time",
-                origin="Kolkata",
-                destination="Bhubaneswar",
-                eta="2026-10-05",
-                risk_score=30
-            ),
-
-            Shipment(
-                id=20,
-                shipment_code="SHP020",
-                product="Microchips",
-                supplier_id=suppliers[1].id,
-                quantity=4800,
-                historical_lead_time=7,
-                current_lead_time=19,
-                inventory_level=1300,
-                status="Delayed",
-                origin="Delhi",
-                destination="Chandigarh",
-                eta="2026-10-06",
-                risk_score=95
-            )
-        ]
-
-        # ============================================================
-        # CLEAR OLD DATA
-        # ============================================================
-
-        # Important:
-        # Delete child records first because of foreign keys.
-
-        db.query(Outcome).delete()
-
-        db.query(Decision).delete()
-
-        db.query(Prediction).delete()
-
-        db.query(Prescription).delete()
-
-        db.query(Shipment).delete()
+        deleted_decisions = (
+            db.query(Decision)
+            .delete(synchronize_session=False)
+        )
 
         db.commit()
 
-        print("Old shipment and closed-loop data removed.")
+        print(
+            f"Old decisions deleted: "
+            f"{deleted_decisions}"
+        )
 
-        # ============================================================
-        # INSERT 20 SHIPMENTS
-        # ============================================================
-
-        db.add_all(shipments)
+        deleted_predictions = (
+            db.query(Prediction)
+            .delete(synchronize_session=False)
+        )
 
         db.commit()
 
-        print("Inserted 20 shipments.")
+        print(
+            f"Old predictions deleted: "
+            f"{deleted_predictions}"
+        )
 
-        # ============================================================
-        # RESET SHIPMENT ID SEQUENCE
-        # ============================================================
+        deleted_prescriptions = (
+            db.query(Prescription)
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+
+        print(
+            f"Old prescriptions deleted: "
+            f"{deleted_prescriptions}"
+        )
+
+        deleted_shipments = (
+            db.query(Shipment)
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+
+        print(
+            f"Old shipments deleted: "
+            f"{deleted_shipments}"
+        )
 
         db.execute(
             text(
-                """
-                SELECT setval(
-                    pg_get_serial_sequence('shipments', 'id'),
-                    20,
-                    true
-                )
-                """
+                "ALTER SEQUENCE shipments_id_seq "
+                "RESTART WITH 1"
+            )
+        )
+
+        db.execute(
+            text(
+                "ALTER SEQUENCE decisions_id_seq "
+                "RESTART WITH 1"
+            )
+        )
+
+        db.execute(
+            text(
+                "ALTER SEQUENCE outcomes_id_seq "
+                "RESTART WITH 1"
             )
         )
 
         db.commit()
 
-        # ============================================================
-        # PREDICTIONS FOR ALL 20 SHIPMENTS
-        # ============================================================
+        print("Shipment ID sequence reset to 1")
+        print("Decision ID sequence reset to 1")
+        print("Outcome ID sequence reset to 1")
 
-        predictions = [
+        shipment_objects = []
 
-            Prediction(
-                shipment_id=1,
-                delay_probability=87,
-                predicted_delay_days=14,
-                model_name="XGBoost"
-            ),
+        for item in SHIPMENTS:
 
-            Prediction(
-                shipment_id=2,
-                delay_probability=12,
-                predicted_delay_days=2,
-                model_name="XGBoost"
-            ),
+            supplier = suppliers[
+                item["supplier_index"]
+            ]
 
-            Prediction(
-                shipment_id=3,
-                delay_probability=76,
-                predicted_delay_days=10,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=4,
-                delay_probability=15,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=5,
-                delay_probability=85,
-                predicted_delay_days=7,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=6,
-                delay_probability=20,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=7,
-                delay_probability=8,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=8,
-                delay_probability=91,
-                predicted_delay_days=12,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=9,
-                delay_probability=25,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=10,
-                delay_probability=55,
-                predicted_delay_days=6,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=11,
-                delay_probability=18,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=12,
-                delay_probability=10,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=13,
-                delay_probability=22,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=14,
-                delay_probability=72,
-                predicted_delay_days=9,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=15,
-                delay_probability=5,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=16,
-                delay_probability=60,
-                predicted_delay_days=7,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=17,
-                delay_probability=14,
-                predicted_delay_days=1,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=18,
-                delay_probability=88,
-                predicted_delay_days=11,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=19,
-                delay_probability=30,
-                predicted_delay_days=2,
-                model_name="XGBoost"
-            ),
-
-            Prediction(
-                shipment_id=20,
-                delay_probability=95,
-                predicted_delay_days=13,
-                model_name="XGBoost"
+            shipment = Shipment(
+                shipment_code=item["shipment_code"],
+                product=item["product"],
+                supplier_id=supplier.id,
+                quantity=item["quantity"],
+                historical_lead_time=item[
+                    "historical_lead_time"
+                ],
+                current_lead_time=item[
+                    "current_lead_time"
+                ],
+                inventory_level=item[
+                    "inventory_level"
+                ],
+                status=item["status"],
+                origin=item["origin"],
+                destination=item["destination"],
+                eta=item["eta"],
+                risk_score=item["risk_score"],
             )
-        ]
 
-        db.add_all(predictions)
+            db.add(shipment)
+            shipment_objects.append(shipment)
 
         db.commit()
 
-        print("Inserted 20 predictions.")
+        for shipment in shipment_objects:
+            db.refresh(shipment)
 
-        # ============================================================
-        # PRESCRIPTIONS FOR ALL 20 SHIPMENTS
-        # ============================================================
+        print(
+            f"Shipments created: "
+            f"{len(shipment_objects)}"
+        )
 
-        prescription_data = [
+        print()
+        print("Shipment IDs:")
 
-            ("Air Freight", "Use air freight for faster delivery",
-             15000, 3, 10),
+        for shipment in shipment_objects:
 
-            ("Standard Transport", "Continue with standard transportation",
-             9000, 2, 12),
-
-            ("Air Freight", "Use air freight to reduce delay risk",
-             18000, 4, 15),
-
-            ("Standard Transport", "Continue with standard transportation",
-             8000, 2, 15),
-
-            ("Air Freight", "Use air freight to handle high delay risk",
-             14500, 4, 12),
-
-            ("Standard Transport", "Use standard transport for stable shipment",
-             9500, 2, 20),
-
-            ("Standard Transport", "Continue with normal transportation",
-             8500, 2, 8),
-
-            ("Air Freight", "Use air freight for high-risk shipment",
-             19000, 4, 10),
-
-            ("Standard Transport", "Continue with standard transportation",
-             8200, 2, 25),
-
-            ("Secondary Supplier", "Use an alternate supplier to reduce delay",
-             12500, 5, 30),
-
-            ("Standard Transport", "Continue with standard transportation",
-             9000, 2, 18),
-
-            ("Standard Transport", "Continue with normal transportation",
-             8800, 2, 10),
-
-            ("Standard Transport", "Continue with normal transportation",
-             7600, 2, 22),
-
-            ("Air Freight", "Use air freight to reduce high delay risk",
-             15500, 4, 15),
-
-            ("Standard Transport", "Continue with normal transportation",
-             9500, 2, 5),
-
-            ("Secondary Supplier", "Use alternate supplier to reduce delay",
-             12000, 5, 35),
-
-            ("Standard Transport", "Continue with normal transportation",
-             9200, 2, 14),
-
-            ("Air Freight", "Use air freight for high-risk shipment",
-             16000, 4, 12),
-
-            ("Standard Transport", "Continue with normal transportation",
-             8700, 2, 30),
-
-            ("Air Freight", "Use air freight for extremely high-risk shipment",
-             17000, 4, 10)
-        ]
-
-        prescriptions = []
-
-        for index, data in enumerate(
-            prescription_data,
-            start=1
-        ):
-
-            option_name = data[0]
-            description = data[1]
-            estimated_cost = data[2]
-            delivery_days = data[3]
-            risk_score = data[4]
-
-            prescription = Prescription(
-
-                shipment_id=index,
-
-                option_name=option_name,
-
-                description=description,
-
-                estimated_cost=estimated_cost,
-
-                delivery_days=delivery_days,
-
-                risk_score=risk_score,
-
-                recommendation_rank=1
+            print(
+                f"{shipment.id:2d} -> "
+                f"{shipment.shipment_code}"
             )
 
-            prescriptions.append(prescription)
+        prediction_objects = []
 
-        db.add_all(prescriptions)
+        for shipment in shipment_objects:
+
+            delay_probability = (
+                shipment.risk_score / 100.0
+            )
+
+            if (
+                shipment.current_lead_time
+                > shipment.historical_lead_time
+            ):
+
+                predicted_delay_days = (
+                    shipment.current_lead_time
+                    - shipment.historical_lead_time
+                )
+
+            else:
+
+                predicted_delay_days = 0
+
+            prediction = Prediction(
+                shipment_id=shipment.id,
+                delay_probability=delay_probability,
+                predicted_delay_days=predicted_delay_days,
+                model_name="Supply Prescript Risk Model",
+            )
+
+            db.add(prediction)
+            prediction_objects.append(prediction)
 
         db.commit()
 
-        for prescription in prescriptions:
-            db.refresh(prescription)
+        print(
+            f"Predictions created: "
+            f"{len(prediction_objects)}"
+        )
 
-        print("Inserted 20 prescriptions.")
+  
+        prescription_objects = []
 
-        # ============================================================
-        # DECISIONS FOR ALL 20 SHIPMENTS
-        # ============================================================
+        for shipment in shipment_objects:
 
-        decisions = []
-
-        for index, prescription in enumerate(
-            prescriptions,
-            start=1
-        ):
-
-            decision = Decision(
-
-                shipment_id=index,
-
-                prescription_id=prescription.id,
-
-                selected_option=prescription.option_name,
-
-                estimated_cost=prescription.estimated_cost,
-
-                user_name="Manager",
-
-                decision_status="Executed"
+            air_cost = round(
+                10000 + (
+                    shipment.quantity * 1.25
+                ),
+                2
             )
 
-            decisions.append(decision)
+            air_delivery_days = max(
+                2,
+                round(
+                    shipment.historical_lead_time
+                    * 0.5
+                )
+            )
 
-        db.add_all(decisions)
+            air_prescription = Prescription(
+                shipment_id=shipment.id,
+                option_name="Air Freight",
+                description=(
+                    "Use expedited air freight "
+                    "to reduce delivery time "
+                    "and minimize delay risk."
+                ),
+                estimated_cost=air_cost,
+                delivery_days=air_delivery_days,
+                risk_score=10,
+                recommendation_rank=1,
+            )
+
+            db.add(air_prescription)
+            prescription_objects.append(
+                air_prescription
+            )
+
+            secondary_cost = round(
+                air_cost * 1.10,
+                2
+            )
+
+            secondary_delivery_days = max(
+                3,
+                shipment.historical_lead_time
+            )
+
+            secondary_prescription = Prescription(
+                shipment_id=shipment.id,
+                option_name="Secondary Supplier",
+                description=(
+                    "Use a secondary supplier "
+                    "to reduce dependency on "
+                    "the current supplier."
+                ),
+                estimated_cost=secondary_cost,
+                delivery_days=secondary_delivery_days,
+                risk_score=20,
+                recommendation_rank=2,
+            )
+
+            db.add(secondary_prescription)
+            prescription_objects.append(
+                secondary_prescription
+            )
+
+            launch_cost = round(
+                max(
+                    5000,
+                    air_cost * 0.35
+                ),
+                2
+            )
+
+            launch_delivery_days = (
+                shipment.current_lead_time
+            )
+
+            launch_prescription = Prescription(
+                shipment_id=shipment.id,
+                option_name="Delay Product Launch",
+                description=(
+                    "Delay the product launch "
+                    "to absorb the expected "
+                    "supply delay."
+                ),
+                estimated_cost=launch_cost,
+                delivery_days=launch_delivery_days,
+                risk_score=60,
+                recommendation_rank=3,
+            )
+
+            db.add(launch_prescription)
+            prescription_objects.append(
+                launch_prescription
+            )
 
         db.commit()
 
-        for decision in decisions:
-            db.refresh(decision)
+        print(
+            f"Prescriptions created: "
+            f"{len(prescription_objects)}"
+        )
 
-        print("Inserted 20 decisions.")
+        supplier_count = db.query(Supplier).count()
+        shipment_count = db.query(Shipment).count()
+        prediction_count = db.query(Prediction).count()
+        prescription_count = db.query(Prescription).count()
+        decision_count = db.query(Decision).count()
+        outcome_count = db.query(Outcome).count()
 
-        # ============================================================
-        # OUTCOMES FOR ALL 20 DECISIONS
-        # ============================================================
+        print()
+        print("=" * 60)
+        print("DATABASE SEED COMPLETED")
+        print("=" * 60)
 
-        outcomes = []
+        print(f"Suppliers       : {supplier_count}")
+        print(f"Shipments       : {shipment_count}")
+        print(f"Predictions     : {prediction_count}")
+        print(f"Prescriptions   : {prescription_count}")
+        print(f"Decisions       : {decision_count}")
+        print(f"Outcomes        : {outcome_count}")
 
-        # Actual delivery days and actual cost are intentionally
-        # varied so the Decision History page demonstrates:
-        #
-        # - Successful decisions
-        # - Delayed decisions
-        # - Cost savings
-        # - Negative savings
-        # - On-time deliveries
-        # - Late deliveries
-
-        actual_delivery_days = [
-
-            3,   # Shipment 1
-            2,   # Shipment 2
-            5,   # Shipment 3
-            2,   # Shipment 4
-            6,   # Shipment 5
-            2,   # Shipment 6
-            2,   # Shipment 7
-            6,   # Shipment 8
-            2,   # Shipment 9
-            7,   # Shipment 10
-            2,   # Shipment 11
-            2,   # Shipment 12
-            2,   # Shipment 13
-            6,   # Shipment 14
-            2,   # Shipment 15
-            7,   # Shipment 16
-            2,   # Shipment 17
-            6,   # Shipment 18
-            2,   # Shipment 19
-            7    # Shipment 20
-        ]
-
-        actual_costs = [
-
-            14000,   # Shipment 1
-            8500,    # Shipment 2
-            17500,   # Shipment 3
-            7600,    # Shipment 4
-            15000,   # Shipment 5
-            9000,    # Shipment 6
-            8000,    # Shipment 7
-            18500,   # Shipment 8
-            7900,    # Shipment 9
-            13000,   # Shipment 10
-            8500,    # Shipment 11
-            8200,    # Shipment 12
-            7400,    # Shipment 13
-            16000,   # Shipment 14
-            9000,    # Shipment 15
-            12500,   # Shipment 16
-            8800,    # Shipment 17
-            16500,   # Shipment 18
-            8300,    # Shipment 19
-            18000    # Shipment 20
-        ]
-
-        outcome_statuses = [
-
-            "Successful",
-            "Successful",
-            "Successful",
-            "Successful",
-            "Delayed",
-            "Successful",
-            "Successful",
-            "Delayed",
-            "Successful",
-            "Delayed",
-            "Successful",
-            "Successful",
-            "Successful",
-            "Delayed",
-            "Successful",
-            "Delayed",
-            "Successful",
-            "Delayed",
-            "Successful",
-            "Delayed"
-        ]
-
-        outcome_notes = [
-
-            "Air freight delivered on time and below estimated cost.",
-
-            "Standard transport delivered on time with cost savings.",
-
-            "Air freight reduced the expected delivery delay.",
-
-            "Shipment delivered on schedule.",
-
-            "Shipment arrived later than expected.",
-
-            "Shipment delivered successfully within expected time.",
-
-            "Shipment delivered on time with low risk.",
-
-            "High-risk shipment experienced a delivery delay.",
-
-            "Shipment delivered successfully.",
-
-            "Shipment experienced a moderate delivery delay.",
-
-            "Shipment delivered successfully with cost savings.",
-
-            "Shipment delivered on time.",
-
-            "Shipment delivered successfully.",
-
-            "Shipment arrived later than expected.",
-
-            "Shipment delivered on time with low risk.",
-
-            "Alternate supplier decision still experienced a delay.",
-
-            "Shipment delivered successfully.",
-
-            "High-risk shipment experienced a delivery delay.",
-
-            "Shipment delivered successfully.",
-
-            "High-risk shipment experienced a delivery delay."
-        ]
-
-        for index, decision in enumerate(
-            decisions
-        ):
-
-            outcome = Outcome(
-
-                decision_id=decision.id,
-
-                actual_cost=actual_costs[index],
-
-                actual_delivery_days=actual_delivery_days[index],
-
-                outcome_status=outcome_statuses[index],
-
-                notes=outcome_notes[index]
-            )
-
-            outcomes.append(outcome)
-
-        db.add_all(outcomes)
-
-        db.commit()
-
-        print("Inserted 20 outcomes.")
-
-        # ============================================================
-        # COMPLETE
-        # ============================================================
-
-        print("")
-        print("================================================")
-        print("SAMPLE DATABASE DATA IS READY")
-        print("================================================")
-        print("Suppliers      : 3")
-        print("Shipments      : 20")
-        print("Predictions    : 20")
-        print("Prescriptions  : 20")
-        print("Decisions      : 20")
-        print("Outcomes       : 20")
-        print("================================================")
-        print("Closed-loop data is ready.")
-        print("Decision History should show 20 records.")
-        print("================================================")
-
+        print("=" * 60)
 
     except Exception as error:
 
         db.rollback()
 
-        print("")
-        print("================================================")
-        print("DATABASE SEED ERROR")
-        print("================================================")
-        print(error)
-        print("================================================")
+        print()
+        print("=" * 60)
+        print("SEED FAILED")
+        print("=" * 60)
+        print(f"Error: {error}")
+        print("=" * 60)
 
         raise
 
@@ -929,7 +703,5 @@ def seed_database():
 
         db.close()
 
-
 if __name__ == "__main__":
-
     seed_database()
