@@ -37,6 +37,9 @@ function firstValue(row, keys, fallback = "") {
     }
   }
 
+  return fallback;
+}
+
 
 // ============================================================
 // HELPER FUNCTIONS
