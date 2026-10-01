@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
 
@@ -33,4 +34,7 @@ class DecisionResponse(BaseModel):
 
     decision_status: Optional[str] = None
 
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

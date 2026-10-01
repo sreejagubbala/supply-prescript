@@ -61,18 +61,28 @@ def get_roi():
         else 0
     )
 
-    success_rate = (
+    success_mask = (
         df["Action_Success"]
-        .astype(bool)
-        .mean()
-        * 100
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .isin(["true", "1", "yes"])
+    )
+
+    on_time_mask = (
+        df["On_Time"]
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .isin(["true", "1", "yes"])
+    )
+
+    success_rate = (
+        success_mask.mean() * 100
     )
 
     on_time_rate = (
-        df["On_Time"]
-        .astype(bool)
-        .mean()
-        * 100
+        on_time_mask.mean() * 100
     )
 
     return {
