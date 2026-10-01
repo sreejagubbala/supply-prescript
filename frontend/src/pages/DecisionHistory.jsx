@@ -37,6 +37,8 @@ function firstValue(row, keys, fallback = "") {
     }
   }
 
+  return fallback;
+}
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -261,7 +263,7 @@ export default function DecisionHistory() {
   // ==========================================================
 
   useEffect(() => {
-    loadOutcomes();
+    loadHistory();
     loadDecisions();
   }, []);
 
@@ -1020,12 +1022,12 @@ export default function DecisionHistory() {
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={filteredRecords.slice(0, 10)}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#292929" />
-                    <XAxis dataKey="decisionId" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
+                    <XAxis dataKey="decision_id" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
                     <YAxis stroke="#8eb1d5" />
                     <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #292929" }} />
                     <Legend />
-                    <Bar dataKey="expectedDelivery" name="Expected Days" fill="#60a5fa" />
-                    <Bar dataKey="actualDelivery" name="Actual Days" fill="#c084fc" />
+                    <Bar dataKey="expected_delivery_days" name="Expected Days" fill="#60a5fa" />
+                    <Bar dataKey="actual_delivery_days" name="Actual Days" fill="#c084fc" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1037,15 +1039,15 @@ export default function DecisionHistory() {
                 <ResponsiveContainer width="100%" height={260}>
                   <LineChart data={filteredRecords.slice(0, 10)}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#292929" />
-                    <XAxis dataKey="decisionId" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
+                    <XAxis dataKey="decision_id" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
                     <YAxis stroke="#8eb1d5" />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#111", border: "1px solid #292929" }}
                       formatter={(value) => formatCurrency(value)}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="expectedCost" name="Expected Cost" stroke="#60a5fa" strokeWidth={2} />
-                    <Line type="monotone" dataKey="actualCost" name="Actual Cost" stroke="#c084fc" strokeWidth={2} />
+                    <Line type="monotone" dataKey="expected_cost" name="Expected Cost" stroke="#60a5fa" strokeWidth={2} />
+                    <Line type="monotone" dataKey="actual_cost" name="Actual Cost" stroke="#c084fc" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
