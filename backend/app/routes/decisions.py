@@ -10,8 +10,7 @@ from ..schemas.decision import (
 
 
 router = APIRouter(
-    prefix="/api/decisions",
-    tags=["Decisions"]
+    tags=["Outcomes"]
 )
 
 
@@ -107,7 +106,6 @@ def get_decision(
     )
 
     if decision is None:
-
         raise HTTPException(
             status_code=404,
             detail="Decision not found"
