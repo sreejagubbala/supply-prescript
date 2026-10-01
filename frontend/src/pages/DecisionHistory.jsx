@@ -1,5 +1,4 @@
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -13,7 +12,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// Supply Prescript — Member 5: Closed-Loop & Analytics
+// Decision History. This file is a clean merge of the two conflicting versions.
+
 const API_URL = "http://127.0.0.1:8000/api/outcomes/";
+const DECISIONS_API_URL = "http://127.0.0.1:8000/api/decisions/";
 
 const COLORS = {
   bg: "#0b1120",
@@ -35,40 +38,63 @@ const cardStyle = {
   borderRadius: 14,
 };
 
-const formatMoney = (value) => {
+const asNumber = (value, fallback = 0) => {
   const n = Number(value);
-  if (!Number.isFinite(n)) return "₹0";
-  return `₹${n.toLocaleString("en-IN", {
-    maximumFractionDigits: 0,
-  })}`;
-};
-
-const asNumber = (value) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : fallback;
 };
 
 const asBool = (value) =>
   value === true ||
   value === 1 ||
   String(value).toLowerCase() === "true" ||
-  String(value).toLowerCase() === "yes";
+  String(value).toLowerCase() === "yes" ||
+  String(value) === "1";
+
+const formatMoney = (value) =>
+  `₹${asNumber(value).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
+
+const formatNumber = (value) => asNumber(value).toLocaleString("en-IN");
+
+const formatDate = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+};
 
 function normalizeResponse(data) {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.items)) return data.items;
   if (Array.isArray(data?.outcomes)) return data.outcomes;
+  if (Array.isArray(data?.records)) return data.records;
   return [];
 }
 
 function getField(row, ...names) {
   for (const name of names) {
-    if (
-      row[name] !== undefined &&
-      row[name] !== null &&
-      row[name] !== ""
-    ) {
+    if (row?.[name] !== undefined && row?.[name] !== null && row?.[name] !== "") {
       return row[name];
     }
   }
@@ -76,242 +102,159 @@ function getField(row, ...names) {
 }
 
 function normalizeRow(row, index) {
-  const decisionId = getField(row, "Decision_ID", "decision_id", "id");
-
-  const shipmentId = getField(
-    row,
-    "Shipment_ID",
-    "shipment_id"
-  );
-
-  const shippingMode = getField(
-    row,
-    "Shipping_Mode",
-    "shipping_mode"
-  );
-
-  const recommended = getField(
-    row,
-    "Recommended_Action",
-    "recommended_action"
-  );
-
-  const selected = getField(
-    row,
-    "Selected_Action",
-    "selected_action"
-  );
-
-  const expectedCost = asNumber(
-    getField(row, "Expected_Cost", "expected_cost")
-  );
-
-  const actualCost = asNumber(
-    getField(row, "Actual_Cost", "actual_cost")
-  );
-
-  const saving = asNumber(
-    getField(
-      row,
-      "Cost_Saving",
-      "cost_saving",
-      "Savings",
-      "savings"
-    )
-  );
-
+  const onTime = getField(row, "On_Time", "on_time", "is_on_time");
+  const actionSuccess = getField(row, "Action_Success", "action_success", "success");
   const delay = asNumber(
-    getField(
-      row,
-      "Actual_Delay_Days",
-      "actual_delay_days",
-      "Delay_Days",
-      "delay_days"
-    )
+    getField(row, "Actual_Delay_Days", "actual_delay_days", "Delay_Days", "delay_days")
   );
-
-  const onTime = getField(
-    row,
-    "On_Time",
-    "on_time"
-  );
-
-  const actionSuccess = getField(
-    row,
-    "Action_Success",
-    "action_success"
-  );
-
   const success =
     actionSuccess !== null
       ? asBool(actionSuccess)
       : onTime !== null
-      ? asBool(onTime)
-      : delay <= 0;
-
-  const date = getField(
-    row,
-    "Decision_Date",
-    "decision_date",
-    "date"
-  );
+        ? asBool(onTime)
+        : delay <= 0;
 
   return {
     ...row,
     _index: index,
-    decisionId: decisionId ?? index + 1,
-    shipmentId: shipmentId ?? "-",
-    shippingMode: shippingMode ?? "-",
-    recommended: recommended ?? "-",
-    selected: selected ?? "-",
-    expectedCost,
-    actualCost,
-    saving,
+    decisionId: getField(row, "Decision_ID", "decision_id", "id") ?? index + 1,
+    shipmentId: getField(row, "Shipment_ID", "shipment_id") ?? "-",
+    shippingMode: getField(row, "Shipping_Mode", "shipping_mode", "mode") ?? "-",
+    recommended: getField(row, "Recommended_Action", "recommended_action") ?? "-",
+    selected: getField(row, "Selected_Action", "selected_action", "selected_option") ?? "-",
+    expectedCost: asNumber(getField(row, "Expected_Cost", "expected_cost", "estimated_cost")),
+    actualCost: asNumber(getField(row, "Actual_Cost", "actual_cost")),
+    saving: asNumber(getField(row, "Cost_Saving", "cost_saving", "Savings", "savings")),
     delay,
     success,
-    date: date ?? "-",
+    date: getField(row, "Decision_Date", "decision_date", "date", "created_at") ?? "-",
   };
 }
 
 export default function DecisionHistory() {
   const [rawData, setRawData] = useState([]);
+  const [decisions, setDecisions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+  const [decisionsError, setDecisionsError] = useState("");
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setDecisionsError("");
 
-      const response = await fetch(API_URL);
+    const [outcomesResult, decisionsResult] = await Promise.allSettled([
+      fetch(API_URL),
+      fetch(DECISIONS_API_URL),
+    ]);
 
-      if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
+    if (outcomesResult.status === "fulfilled") {
+      try {
+        const response = outcomesResult.value;
+        if (!response.ok) throw new Error(`Outcomes API returned HTTP ${response.status}`);
+        setRawData(normalizeResponse(await response.json()));
+      } catch (err) {
+        console.error("Failed to load outcomes:", err);
+        setRawData([]);
+        setError("Unable to load outcome analytics. Check that the FastAPI backend is running and /api/outcomes/ is available.");
       }
-
-      const json = await response.json();
-      setRawData(normalizeResponse(json));
-    } catch (err) {
-      console.error(err);
-      setError(
-        "Unable to load decision history. Make sure the FastAPI backend is running."
-      );
-    } finally {
-      setLoading(false);
+    } else {
+      console.error("Failed to request outcomes:", outcomesResult.reason);
+      setRawData([]);
+      setError("Unable to connect to the outcomes API. Check that the FastAPI backend is running.");
     }
-  };
+
+    if (decisionsResult.status === "fulfilled") {
+      try {
+        const response = decisionsResult.value;
+        if (!response.ok) throw new Error(`Decisions API returned HTTP ${response.status}`);
+        const json = await response.json();
+        setDecisions(Array.isArray(json) ? json : normalizeResponse(json));
+      } catch (err) {
+        console.error("Failed to load executed decisions:", err);
+        setDecisions([]);
+        setDecisionsError("Executed decisions could not be loaded from /api/decisions/.");
+      }
+    } else {
+      console.error("Failed to request decisions:", decisionsResult.reason);
+      setDecisions([]);
+      setDecisionsError("Could not connect to /api/decisions/.");
+    }
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const rows = useMemo(
-    () => rawData.map(normalizeRow),
-    [rawData]
-  );
+  const rows = useMemo(() => rawData.map(normalizeRow), [rawData]);
 
   const actions = useMemo(() => {
-    const values = rows
-      .map((r) => r.selected)
-      .filter((v) => v && v !== "-");
-
+    const values = rows.map((row) => row.selected).filter((value) => value && value !== "-");
     return ["All", ...Array.from(new Set(values))];
   }, [rows]);
 
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase();
-
     return rows.filter((row) => {
-      const matchesSearch =
-        !term ||
-        String(row.decisionId).toLowerCase().includes(term) ||
-        String(row.shipmentId).toLowerCase().includes(term) ||
-        String(row.shippingMode).toLowerCase().includes(term) ||
-        String(row.selected).toLowerCase().includes(term) ||
-        String(row.recommended).toLowerCase().includes(term);
-
-      const matchesAction =
-        actionFilter === "All" ||
-        row.selected === actionFilter;
-
+      const searchable = [
+        row.decisionId,
+        row.shipmentId,
+        row.shippingMode,
+        row.recommended,
+        row.selected,
+      ].join(" ").toLowerCase();
+      const matchesSearch = !term || searchable.includes(term);
+      const matchesAction = actionFilter === "All" || row.selected === actionFilter;
       const matchesStatus =
         statusFilter === "All" ||
         (statusFilter === "Successful" && row.success) ||
         (statusFilter === "Needs Review" && !row.success);
-
-      return (
-        matchesSearch &&
-        matchesAction &&
-        matchesStatus
-      );
+      return matchesSearch && matchesAction && matchesStatus;
     });
   }, [rows, search, actionFilter, statusFilter]);
 
   const metrics = useMemo(() => {
     const total = rows.length;
-
-    const successful = rows.filter(
-      (r) => r.success
-    ).length;
-
-    const delayed = rows.filter(
-      (r) => r.delay > 0
-    ).length;
-
-    const savings = rows.reduce(
-      (sum, r) => sum + r.saving,
-      0
-    );
-
-    const avgDelay =
-      total > 0
-        ? rows.reduce((sum, r) => sum + r.delay, 0) /
-          total
-        : 0;
-
-    const successRate =
-      total > 0 ? (successful / total) * 100 : 0;
-
+    const successful = rows.filter((row) => row.success).length;
+    const delayed = rows.filter((row) => row.delay > 0).length;
+    const savings = rows.reduce((sum, row) => sum + row.saving, 0);
+    const avgDelay = total ? rows.reduce((sum, row) => sum + row.delay, 0) / total : 0;
     return {
       total,
       successful,
       delayed,
       savings,
       avgDelay,
-      successRate,
+      successRate: total ? (successful / total) * 100 : 0,
     };
   }, [rows]);
 
   const actionData = useMemo(() => {
-    const map = {};
-
+    const counts = {};
     rows.forEach((row) => {
       const action = row.selected || "Unknown";
-      map[action] = (map[action] || 0) + 1;
+      counts[action] = (counts[action] || 0) + 1;
     });
-
-    return Object.entries(map).map(
-      ([action, count]) => ({
-        action,
-        count,
-      })
-    );
+    return Object.entries(counts).map(([action, count]) => ({ action, count }));
   }, [rows]);
 
-  const trendData = useMemo(() => {
-    return rows
-      .slice()
-      .reverse()
-      .map((row, index) => ({
-        name: row.date !== "-" ? row.date : `D${index + 1}`,
-        savings: row.saving,
-        delay: row.delay,
-      }));
-  }, [rows]);
+  const trendData = useMemo(
+    () =>
+      rows
+        .slice()
+        .reverse()
+        .map((row, index) => ({
+          name: row.date !== "-" ? formatDate(row.date) : `D${index + 1}`,
+          savings: row.saving,
+          delay: row.delay,
+        })),
+    [rows]
+  );
 
   return (
     <div
@@ -320,872 +263,245 @@ export default function DecisionHistory() {
         background: COLORS.bg,
         color: COLORS.text,
         padding: "28px",
-        fontFamily:
-          "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {/* HEADER */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
           gap: 20,
-          marginBottom: 28,
+          marginBottom: 24,
           flexWrap: "wrap",
         }}
       >
         <div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 8,
-            }}
-          >
-            <div
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 10,
-                background:
-                  "rgba(96,165,250,0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              ↳
-            </div>
-
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 28,
-                fontWeight: 750,
-              }}
-            >
-              Decision History
-            </h1>
-          </div>
-
-          <p
-            style={{
-              margin: 0,
-              color: COLORS.muted,
-              fontSize: 14,
-            }}
-          >
-            Track recommendations, operational decisions,
-            outcomes and business impact.
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 750 }}>Decision History</h1>
+          <p style={{ margin: "8px 0 0", color: COLORS.muted, fontSize: 14 }}>
+            Track recommendations, operational decisions, outcomes and business impact.
           </p>
+          <div style={{ marginTop: 10, color: error ? COLORS.red : COLORS.green, fontSize: 12 }}>
+            ● {error ? "Outcomes API unavailable" : loading ? "Loading analytics..." : "Analytics loaded"}
+          </div>
         </div>
-
-        <button
-          onClick={loadData}
-          style={{
-            background: COLORS.panel,
-            border: `1px solid ${COLORS.border}`,
-            color: COLORS.text,
-            borderRadius: 9,
-            padding: "10px 16px",
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
+        <button onClick={loadData} style={buttonStyle}>
           ↻ Refresh
         </button>
       </div>
 
-      {/* ERROR */}
-      {error && (
-        <div
-          style={{
-            ...cardStyle,
-            padding: 18,
-            marginBottom: 22,
-            borderColor: "rgba(248,113,113,0.4)",
-            background:
-              "rgba(248,113,113,0.08)",
-          }}
-        >
-          <div
-            style={{
-              color: COLORS.red,
-              fontWeight: 700,
-              marginBottom: 5,
-            }}
-          >
-            Unable to load decision history
-          </div>
+      {error && <Notice message={error} danger />}
+      {decisionsError && <Notice message={decisionsError} />}
 
-          <div
-            style={{
-              color: COLORS.muted,
-              fontSize: 13,
-            }}
-          >
-            {error}
-          </div>
-        </div>
-      )}
-
-      {/* LOADING */}
       {loading ? (
-        <div
-          style={{
-            ...cardStyle,
-            padding: 70,
-            textAlign: "center",
-            color: COLORS.muted,
-          }}
-        >
-          Loading decision analytics...
+        <div style={{ ...cardStyle, padding: 60, textAlign: "center", color: COLORS.muted }}>
+          Loading decision history...
         </div>
       ) : (
         <>
-          {/* KPI CARDS */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit,minmax(190px,1fr))",
+              gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
               gap: 16,
               marginBottom: 22,
             }}
           >
-            <MetricCard
-              title="Total Decisions"
-              value={metrics.total}
-              subtitle="Processed records"
-              icon="◉"
-              accent={COLORS.blue}
-            />
-
-            <MetricCard
-              title="Success Rate"
-              value={`${metrics.successRate.toFixed(1)}%`}
-              subtitle={`${metrics.successful} successful outcomes`}
-              icon="✓"
-              accent={COLORS.green}
-            />
-
-            <MetricCard
-              title="Cost Savings"
-              value={formatMoney(metrics.savings)}
-              subtitle="Closed-loop savings"
-              icon="₹"
-              accent={COLORS.purple}
-            />
-
-            <MetricCard
-              title="Delayed"
-              value={metrics.delayed}
-              subtitle={`Avg delay ${metrics.avgDelay.toFixed(1)} days`}
-              icon="!"
-              accent={COLORS.red}
-            />
+            <MetricCard title="Total Outcomes" value={formatNumber(metrics.total)} subtitle="Outcome records" icon="◉" accent={COLORS.blue} />
+            <MetricCard title="Success Rate" value={`${metrics.successRate.toFixed(1)}%`} subtitle={`${metrics.successful} successful outcomes`} icon="✓" accent={COLORS.green} />
+            <MetricCard title="Cost Savings" value={formatMoney(metrics.savings)} subtitle="Recorded savings" icon="₹" accent={COLORS.purple} />
+            <MetricCard title="Delayed" value={formatNumber(metrics.delayed)} subtitle={`Average delay ${metrics.avgDelay.toFixed(1)} days`} icon="!" accent={COLORS.red} />
+            <MetricCard title="Executed Decisions" value={formatNumber(decisions.length)} subtitle="Decision API records" icon="↳" accent={COLORS.yellow} />
           </div>
 
-          {/* CHART ROW */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns:
-                "minmax(0,2fr) minmax(300px,1fr)",
+              gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
               gap: 18,
               marginBottom: 22,
             }}
           >
-            {/* TREND */}
-            <div
-              style={{
-                ...cardStyle,
-                padding: 20,
-                minHeight: 350,
-              }}
-            >
-              <div style={{ marginBottom: 18 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontSize: 16,
-                  }}
-                >
-                  Outcome Trend
-                </h2>
-
-                <p
-                  style={{
-                    margin: "5px 0 0",
-                    color: COLORS.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  Cost savings and delay across decisions
-                </p>
-              </div>
-
-              {trendData.length > 0 ? (
-                <ResponsiveContainer
-                  width="100%"
-                  height={270}
-                >
+            <section style={{ ...cardStyle, padding: 20, minHeight: 340 }}>
+              <h2 style={sectionTitle}>Outcome Trend</h2>
+              <p style={sectionSubtitle}>Cost savings and delay across recorded outcomes</p>
+              {trendData.length ? (
+                <ResponsiveContainer width="100%" height={270}>
                   <LineChart data={trendData}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={COLORS.border}
-                    />
-
-                    <XAxis
-                      dataKey="name"
-                      stroke={COLORS.muted}
-                      tick={{
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <YAxis
-                      stroke={COLORS.muted}
-                      tick={{
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <Tooltip
-                      contentStyle={{
-                        background: COLORS.panel2,
-                        border: `1px solid ${COLORS.border}`,
-                        borderRadius: 8,
-                        color: COLORS.text,
-                      }}
-                    />
-
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} />
+                    <XAxis dataKey="name" stroke={COLORS.muted} tick={{ fontSize: 10 }} />
+                    <YAxis stroke={COLORS.muted} tick={{ fontSize: 10 }} />
+                    <Tooltip contentStyle={tooltipStyle} />
                     <Legend />
-
-                    <Line
-                      type="monotone"
-                      dataKey="savings"
-                      name="Savings"
-                      stroke={COLORS.green}
-                      strokeWidth={2}
-                      dot={false}
-                    />
-
-                    <Line
-                      type="monotone"
-                      dataKey="delay"
-                      name="Delay"
-                      stroke={COLORS.red}
-                      strokeWidth={2}
-                      dot={false}
-                    />
+                    <Line type="monotone" dataKey="savings" name="Savings (₹)" stroke={COLORS.green} strokeWidth={2} />
+                    <Line type="monotone" dataKey="delay" name="Delay (days)" stroke={COLORS.red} strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
-              ) : (
-                <EmptyChart />
-              )}
-            </div>
+              ) : <EmptyChart />}
+            </section>
 
-            {/* ACTION DISTRIBUTION */}
-            <div
-              style={{
-                ...cardStyle,
-                padding: 20,
-                minHeight: 350,
-              }}
-            >
-              <div style={{ marginBottom: 18 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontSize: 16,
-                  }}
-                >
-                  Selected Actions
-                </h2>
-
-                <p
-                  style={{
-                    margin: "5px 0 0",
-                    color: COLORS.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  Distribution of operational decisions
-                </p>
-              </div>
-
-              {actionData.length > 0 ? (
-                <ResponsiveContainer
-                  width="100%"
-                  height={270}
-                >
-                  <BarChart
-                    data={actionData}
-                    layout="vertical"
-                    margin={{
-                      left: 15,
-                      right: 15,
-                    }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={COLORS.border}
-                    />
-
-                    <XAxis
-                      type="number"
-                      stroke={COLORS.muted}
-                    />
-
-                    <YAxis
-                      type="category"
-                      dataKey="action"
-                      width={100}
-                      stroke={COLORS.muted}
-                      tick={{
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <Tooltip
-                      contentStyle={{
-                        background: COLORS.panel2,
-                        border: `1px solid ${COLORS.border}`,
-                        borderRadius: 8,
-                      }}
-                    />
-
-                    <Bar
-                      dataKey="count"
-                      fill={COLORS.blue}
-                      radius={[0, 5, 5, 0]}
-                    />
+            <section style={{ ...cardStyle, padding: 20, minHeight: 340 }}>
+              <h2 style={sectionTitle}>Selected Actions</h2>
+              <p style={sectionSubtitle}>Distribution of operational decisions</p>
+              {actionData.length ? (
+                <ResponsiveContainer width="100%" height={270}>
+                  <BarChart data={actionData} layout="vertical" margin={{ left: 12, right: 12 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} />
+                    <XAxis type="number" stroke={COLORS.muted} />
+                    <YAxis type="category" dataKey="action" width={110} stroke={COLORS.muted} tick={{ fontSize: 10 }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="count" name="Decisions" fill={COLORS.blue} radius={[0, 5, 5, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
-                <EmptyChart />
-              )}
-            </div>
+              ) : <EmptyChart />}
+            </section>
           </div>
 
-          {/* FILTER BAR */}
-          <div
-            style={{
-              ...cardStyle,
-              padding: 16,
-              marginBottom: 18,
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <input
-              value={search}
-              onChange={(e) =>
-                setSearch(e.target.value)
-              }
-              placeholder="Search decision, shipment, action..."
-              style={{
-                flex: 1,
-                minWidth: 240,
-                background: COLORS.panel2,
-                border: `1px solid ${COLORS.border}`,
-                color: COLORS.text,
-                borderRadius: 8,
-                padding: "10px 13px",
-                outline: "none",
-              }}
-            />
-
-            <select
-              value={actionFilter}
-              onChange={(e) =>
-                setActionFilter(e.target.value)
-              }
-              style={selectStyle}
-            >
-              {actions.map((action) => (
-                <option
-                  key={action}
-                  value={action}
-                  style={{
-                    background: COLORS.panel,
-                  }}
-                >
-                  {action === "All"
-                    ? "All Actions"
-                    : action}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value)
-              }
-              style={selectStyle}
-            >
-              <option value="All">All Outcomes</option>
-              <option value="Successful">
-                Successful
-              </option>
-              <option value="Needs Review">
-                Needs Review
-              </option>
-            </select>
-          </div>
-
-          {/* TABLE */}
-          <div
-            style={{
-              ...cardStyle,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                padding: "20px 20px 16px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 15,
-              }}
-            >
+          <section style={{ ...cardStyle, overflow: "hidden", marginBottom: 22 }}>
+            <div style={tableHeaderStyle}>
               <div>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontSize: 17,
-                  }}
-                >
-                  Decision Records
-                </h2>
-
-                <p
-                  style={{
-                    margin: "5px 0 0",
-                    color: COLORS.muted,
-                    fontSize: 12,
-                  }}
-                >
-                  {filteredRows.length} of{" "}
-                  {rows.length} records
-                </p>
+                <h2 style={{ margin: 0, fontSize: 17 }}>Executed Decisions</h2>
+                <p style={sectionSubtitle}>Decisions recorded from the prescription workflow</p>
               </div>
-
-              <div
-                style={{
-                  color: COLORS.muted,
-                  fontSize: 12,
-                }}
-              >
-                Closed-loop analytics
-              </div>
+              <span style={{ color: COLORS.muted, fontSize: 12 }}>{decisions.length} records</span>
             </div>
-
-            {filteredRows.length === 0 ? (
-              <div
-                style={{
-                  padding: 60,
-                  textAlign: "center",
-                  color: COLORS.muted,
-                }}
-              >
-                No decision records match the
-                selected filters.
-              </div>
+            {decisions.length === 0 ? (
+              <div style={emptyStyle}>No executed decisions found. Confirm that /api/decisions/ returns records.</div>
             ) : (
-              <div
-                style={{
-                  overflowX: "auto",
-                }}
-              >
-                <table
-                  style={{
-                    width: "100%",
-                    minWidth: 1200,
-                    borderCollapse: "collapse",
-                  }}
-                >
+              <div style={{ overflowX: "auto" }}>
+                <table style={tableStyle}>
                   <thead>
-                    <tr>
-                      {[
-                        "Decision",
-                        "Shipment",
-                        "Mode",
-                        "Recommendation",
-                        "Selected Action",
-                        "Expected Cost",
-                        "Actual Cost",
-                        "Savings",
-                        "Delay",
-                        "Outcome",
-                      ].map((heading) => (
-                        <th
-                          key={heading}
-                          style={thStyle}
-                        >
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
+                    <tr>{["Decision ID", "Shipment ID", "Selected Option", "Cost", "Executed By", "Status", "Date"].map((heading) => <th key={heading} style={thStyle}>{heading}</th>)}</tr>
                   </thead>
-
                   <tbody>
-                    {filteredRows.map(
-                      (row, index) => (
-                        <tr
-                          key={`${row.decisionId}-${index}`}
-                          style={{
-                            borderTop: `1px solid ${COLORS.border}`,
-                          }}
-                        >
-                          <td style={tdStyle}>
-                            <span
-                              style={{
-                                color: COLORS.blue,
-                                fontWeight: 700,
-                              }}
-                            >
-                              #{row.decisionId}
-                            </span>
-                          </td>
-
-                          <td style={tdStyle}>
-                            {row.shipmentId}
-                          </td>
-
-                          <td style={tdStyle}>
-                            <Badge text={row.shippingMode} />
-                          </td>
-
-                          <td style={tdStyle}>
-                            {row.recommended}
-                          </td>
-
-                          <td style={tdStyle}>
-                            <span
-                              style={{
-                                color: COLORS.yellow,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {row.selected}
-                            </span>
-                          </td>
-
-                          <td style={tdStyle}>
-                            {formatMoney(
-                              row.expectedCost
-                            )}
-                          </td>
-
-                          <td style={tdStyle}>
-                            {formatMoney(
-                              row.actualCost
-                            )}
-                          </td>
-
-                          <td style={tdStyle}>
-                            <span
-                              style={{
-                                color:
-                                  row.saving >= 0
-                                    ? COLORS.green
-                                    : COLORS.red,
-                                fontWeight: 700,
-                              }}
-                            >
-                              {row.saving >= 0
-                                ? "+"
-                                : ""}
-                              {formatMoney(row.saving)}
-                            </span>
-                          </td>
-
-                          <td style={tdStyle}>
-                            <span
-                              style={{
-                                color:
-                                  row.delay > 0
-                                    ? COLORS.red
-                                    : COLORS.green,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {row.delay}d
-                            </span>
-                          </td>
-
-                          <td style={tdStyle}>
-                            <StatusBadge
-                              success={row.success}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    )}
+                    {[...decisions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((decision) => (
+                      <tr key={decision.id}>
+                        <td style={tdStyle}><span style={{ color: COLORS.blue, fontWeight: 700 }}>DEC-{String(decision.id ?? "-").padStart(4, "0")}</span></td>
+                        <td style={tdStyle}>{decision.shipment_id ?? "-"}</td>
+                        <td style={tdStyle}>{decision.selected_option ?? "-"}</td>
+                        <td style={tdStyle}>{formatMoney(decision.estimated_cost)}</td>
+                        <td style={tdStyle}>{decision.user_name ?? "-"}</td>
+                        <td style={tdStyle}><StatusBadge success={String(decision.decision_status ?? "").toLowerCase().includes("execut") || String(decision.decision_status ?? "").toLowerCase().includes("complete")} label={decision.decision_status ?? "Recorded"} /></td>
+                        <td style={tdStyle}>{formatDateTime(decision.created_at)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
+          </section>
 
-          {/* FOOTER EXPLANATION */}
-          <div
-            style={{
-              marginTop: 22,
-              ...cardStyle,
-              padding: 20,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                marginBottom: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 8,
-                  background:
-                    "rgba(167,139,250,0.12)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: COLORS.purple,
-                }}
-              >
-                ↻
-              </div>
-
+          <section style={{ ...cardStyle, overflow: "hidden" }}>
+            <div style={tableHeaderStyle}>
               <div>
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 14,
-                  }}
-                >
-                  Closed-Loop Decision Intelligence
-                </div>
-
-                <div
-                  style={{
-                    color: COLORS.muted,
-                    fontSize: 12,
-                    marginTop: 3,
-                  }}
-                >
-                  Prediction → Prescription → Decision →
-                  Outcome → ROI
-                </div>
+                <h2 style={{ margin: 0, fontSize: 17 }}>Decision / Outcome Records</h2>
+                <p style={sectionSubtitle}>Predicted versus actual performance from the closed-loop process</p>
               </div>
+              <span style={{ color: COLORS.muted, fontSize: 12 }}>{filteredRows.length} of {rows.length} records</span>
             </div>
 
-            <p
-              style={{
-                margin: 0,
-                color: COLORS.muted,
-                fontSize: 13,
-                lineHeight: 1.7,
-              }}
-            >
-              Decision History connects the operational
-              recommendation with the action actually
-              selected and its measured outcome. This
-              allows Supply Prescript to evaluate whether
-              recommendations created measurable
-              operational and financial value.
+            <div style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", borderBottom: `1px solid ${COLORS.border}` }}>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search decision, shipment, action..."
+                style={inputStyle}
+              />
+              <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} style={selectStyle}>
+                {actions.map((action) => <option key={action} value={action}>{action === "All" ? "All Actions" : action}</option>)}
+              </select>
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={selectStyle}>
+                <option value="All">All Outcomes</option>
+                <option value="Successful">Successful</option>
+                <option value="Needs Review">Needs Review</option>
+              </select>
+            </div>
+
+            {filteredRows.length === 0 ? (
+              <div style={emptyStyle}>No outcome records match the selected filters.</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>{["Decision", "Shipment", "Mode", "Recommendation", "Selected Action", "Expected Cost", "Actual Cost", "Savings", "Delay", "Outcome"].map((heading) => <th key={heading} style={thStyle}>{heading}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {filteredRows.map((row, index) => (
+                      <tr key={`${row.decisionId}-${row.shipmentId}-${index}`} style={{ borderTop: `1px solid ${COLORS.border}` }}>
+                        <td style={tdStyle}><span style={{ color: COLORS.blue, fontWeight: 700 }}>#{row.decisionId}</span></td>
+                        <td style={tdStyle}>{row.shipmentId}</td>
+                        <td style={tdStyle}><Badge text={row.shippingMode} /></td>
+                        <td style={tdStyle}>{row.recommended}</td>
+                        <td style={tdStyle}><span style={{ color: COLORS.yellow, fontWeight: 600 }}>{row.selected}</span></td>
+                        <td style={tdStyle}>{formatMoney(row.expectedCost)}</td>
+                        <td style={tdStyle}>{formatMoney(row.actualCost)}</td>
+                        <td style={tdStyle}><span style={{ color: row.saving >= 0 ? COLORS.green : COLORS.red, fontWeight: 700 }}>{row.saving >= 0 ? "+" : ""}{formatMoney(row.saving)}</span></td>
+                        <td style={tdStyle}><span style={{ color: row.delay > 0 ? COLORS.red : COLORS.green }}>{row.delay}d</span></td>
+                        <td style={tdStyle}><StatusBadge success={row.success} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section style={{ ...cardStyle, padding: 20, marginTop: 22 }}>
+            <h2 style={{ margin: "0 0 8px", fontSize: 15 }}>Closed-Loop Decision Intelligence</h2>
+            <p style={{ margin: 0, color: COLORS.muted, fontSize: 13, lineHeight: 1.7 }}>
+              Prediction → Prescription → Decision → Outcome → ROI. Decision History connects operational recommendations with selected actions and measured outcomes.
             </p>
-          </div>
+          </section>
         </>
       )}
     </div>
   );
 }
 
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  accent,
-}) {
+function MetricCard({ title, value, subtitle, icon, accent }) {
   return (
-    <div
-      style={{
-        ...cardStyle,
-        padding: 19,
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: 3,
-          height: "100%",
-          background: accent,
-        }}
-      />
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-        }}
-      >
+    <div style={{ ...cardStyle, padding: 19, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, width: 3, height: "100%", background: accent }} />
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
         <div>
-          <div
-            style={{
-              color: COLORS.muted,
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: 0.6,
-              marginBottom: 9,
-            }}
-          >
-            {title}
-          </div>
-
-          <div
-            style={{
-              fontSize: 25,
-              fontWeight: 750,
-            }}
-          >
-            {value}
-          </div>
-
-          <div
-            style={{
-              color: COLORS.muted,
-              fontSize: 11,
-              marginTop: 7,
-            }}
-          >
-            {subtitle}
-          </div>
+          <div style={{ color: COLORS.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 9 }}>{title}</div>
+          <div style={{ fontSize: 25, fontWeight: 750 }}>{value}</div>
+          <div style={{ color: COLORS.muted, fontSize: 11, marginTop: 7 }}>{subtitle}</div>
         </div>
-
-        <div
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 9,
-            background: `${accent}18`,
-            color: accent,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 800,
-          }}
-        >
-          {icon}
-        </div>
+        <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: `${accent}18`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800 }}>{icon}</div>
       </div>
     </div>
   );
 }
 
 function Badge({ text }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        padding: "5px 8px",
-        borderRadius: 6,
-        background: COLORS.panel2,
-        border: `1px solid ${COLORS.border}`,
-        color: COLORS.muted,
-        fontSize: 11,
-      }}
-    >
-      {text}
-    </span>
-  );
+  return <span style={{ display: "inline-flex", padding: "5px 8px", borderRadius: 6, background: COLORS.panel2, border: `1px solid ${COLORS.border}`, color: COLORS.muted, fontSize: 11 }}>{text}</span>;
 }
 
-function StatusBadge({ success }) {
+function StatusBadge({ success, label }) {
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "5px 9px",
-        borderRadius: 20,
-        background: success
-          ? "rgba(52,211,153,0.10)"
-          : "rgba(248,113,113,0.10)",
-        color: success
-          ? COLORS.green
-          : COLORS.red,
-        fontSize: 11,
-        fontWeight: 700,
-      }}
-    >
-      <span>●</span>
-      {success ? "Successful" : "Needs Review"}
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 9px", borderRadius: 20, background: success ? "rgba(52,211,153,0.10)" : "rgba(248,113,113,0.10)", color: success ? COLORS.green : COLORS.red, fontSize: 11, fontWeight: 700 }}>
+      ● {label ?? (success ? "Successful" : "Needs Review")}
     </span>
   );
 }
 
 function EmptyChart() {
-  return (
-    <div
-      style={{
-        height: 270,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: COLORS.muted,
-        fontSize: 13,
-      }}
-    >
-      No chart data available
-    </div>
-  );
+  return <div style={{ height: 270, display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.muted, fontSize: 13 }}>No chart data available</div>;
 }
 
-const thStyle = {
-  padding: "13px 15px",
-  textAlign: "left",
-  background: COLORS.panel2,
-  color: COLORS.muted,
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: 0.5,
-  whiteSpace: "nowrap",
-};
+function Notice({ message, danger = false }) {
+  return <div style={{ ...cardStyle, padding: 14, marginBottom: 14, color: danger ? COLORS.red : COLORS.yellow, fontSize: 13 }}>{message}</div>;
+}
 
-const tdStyle = {
-  padding: "14px 15px",
-  color: COLORS.text,
-  fontSize: 12,
-  whiteSpace: "nowrap",
-};
-
-const selectStyle = {
-  background: COLORS.panel2,
-  border: `1px solid ${COLORS.border}`,
-  color: COLORS.text,
-  borderRadius: 8,
-  padding: "10px 12px",
-  outline: "none",
-  minWidth: 150,
-};
+const sectionTitle = { margin: 0, fontSize: 16 };
+const sectionSubtitle = { margin: "6px 0 0", color: COLORS.muted, fontSize: 12 };
+const tableHeaderStyle = { padding: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 15, flexWrap: "wrap", borderBottom: `1px solid ${COLORS.border}` };
+const tableStyle = { width: "100%", minWidth: 900, borderCollapse: "collapse" };
+const thStyle = { padding: "13px 15px", textAlign: "left", background: COLORS.panel2, color: COLORS.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" };
+const tdStyle = { padding: "14px 15px", color: COLORS.text, fontSize: 12, whiteSpace: "nowrap" };
+const selectStyle = { background: COLORS.panel2, border: `1px solid ${COLORS.border}`, color: COLORS.text, borderRadius: 8, padding: "10px 12px", outline: "none", minWidth: 150 };
+const inputStyle = { flex: 1, minWidth: 220, background: COLORS.panel2, border: `1px solid ${COLORS.border}`, color: COLORS.text, borderRadius: 8, padding: "10px 13px", outline: "none" };
+const buttonStyle = { background: COLORS.panel, border: `1px solid ${COLORS.border}`, color: COLORS.text, borderRadius: 9, padding: "10px 16px", cursor: "pointer", fontWeight: 600 };
+const tooltipStyle = { background: COLORS.panel2, border: `1px solid ${COLORS.border}`, borderRadius: 8, color: COLORS.text };
+const emptyStyle = { padding: 50, textAlign: "center", color: COLORS.muted, fontSize: 13 };

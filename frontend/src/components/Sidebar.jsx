@@ -4,7 +4,7 @@ const navItems = [
   { name: 'Operations', path: '/' },
   { name: 'Shipments', path: '/shipments' },
   { name: 'Suppliers', path: '/suppliers' },
-  { name: 'ROI / Analytics', path: '/decision-roi' },
+  { name: 'ROI', path: '/decision-roi' },
   { name: 'History', path: '/decision-history'},
 ]
 
