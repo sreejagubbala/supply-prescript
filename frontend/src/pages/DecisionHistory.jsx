@@ -12,13 +12,27 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
 // ============================================================
 // SUPPLY PRESCRIPT
 // Member 5 - Closed-Loop & Analytics
 // Decision History
 // ============================================================
 
-const API_URL = "http://127.0.0.1:8000/api/outcomes/api/outcomes/";
+// FIXED: removed duplicated /api/outcomes
+const API_URL = "http://127.0.0.1:8000/api/outcomes/";
 const DECISIONS_API_URL = "http://127.0.0.1:8000/api/decisions/";
 
 // ------------------------------------------------------------
@@ -53,7 +67,6 @@ function toNumber(value, fallback = 0) {
     : fallback;
 }
 
-
 function formatCurrency(value) {
   return `₹${toNumber(value).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -61,11 +74,9 @@ function formatCurrency(value) {
   })}`;
 }
 
-
 function formatNumber(value) {
   return toNumber(value).toLocaleString("en-IN");
 }
-
 
 function formatDate(value) {
   if (!value) {
@@ -75,7 +86,7 @@ function formatDate(value) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return value;
+    return String(value);
   }
 
   return date.toLocaleDateString("en-IN", {
@@ -85,7 +96,6 @@ function formatDate(value) {
   });
 }
 
-
 function formatDateTime(value) {
   if (!value) {
     return "-";
@@ -94,7 +104,7 @@ function formatDateTime(value) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return value;
+    return String(value);
   }
 
   return date.toLocaleString("en-IN", {
@@ -106,21 +116,43 @@ function formatDateTime(value) {
   });
 }
 
+function toBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value === null || value === undefined || value === "") {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (["true", "yes", "y", "1"].includes(normalized)) {
+      return true;
+    }
+
+    if (["false", "no", "n", "0"].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return Boolean(value);
+}
 
 function formatRisk(value) {
-  if (value === null || value === undefined) {
+  if (value === null || value === undefined || value === "") {
     return "-";
   }
 
-  const number = Number(value);
+  const risk = Number(value);
 
-  if (!Number.isFinite(number)) {
+  if (!Number.isFinite(risk)) {
     return String(value);
   }
 
-  return number.toFixed(2);
+  return risk.toFixed(2);
 }
-
 
 function getRiskClass(value) {
   const risk = Number(value);
@@ -140,16 +172,13 @@ function getRiskClass(value) {
   return "risk-low";
 }
 
-
 function getStatus(record) {
-  const status = String(
-    record.outcome_status || ""
-  )
+  const status = String(record.outcome_status || "")
     .trim()
     .toLowerCase();
 
   if (
-    record.action_success ||
+    record.action_success === true ||
     status === "success" ||
     status === "successful" ||
     status === "completed"
@@ -163,7 +192,8 @@ function getStatus(record) {
   if (
     status.includes("delay") ||
     status.includes("fail") ||
-    status.includes("unsuccess")
+    status.includes("unsuccess") ||
+    record.on_time === false
   ) {
     return {
       text: "Delayed",
@@ -172,12 +202,10 @@ function getStatus(record) {
   }
 
   return {
-    text:
-      record.outcome_status || "Pending",
+    text: record.outcome_status || "Pending",
     className: "status-warning",
   };
 }
-
 
 // ============================================================
 // COMPONENT
@@ -194,12 +222,14 @@ export default function DecisionHistory() {
   const [decisionsLoading, setDecisionsLoading] = useState(true);
 
 
+  const [decisions, setDecisions] = useState([]);
+  const [decisionsLoading, setDecisionsLoading] = useState(true);
+
   // ==========================================================
   // LOAD DECISION HISTORY
   // ==========================================================
 
   const loadHistory = async () => {
-
     try {
 
       setLoading(true);
@@ -219,23 +249,22 @@ export default function DecisionHistory() {
         await response.json();
 
       if (!Array.isArray(result)) {
-
         throw new Error(
           "Invalid decision history response"
         );
       }
 
       setRecords(result);
-
     } catch (err) {
-
       console.error(
         "Failed to load decision history:",
         err
       );
 
+      setRecords([]);
+
       setError(
-        "Unable to load decision history. Make sure the FastAPI backend and PostgreSQL database are running."
+        "Unable to load decision history. Make sure the FastAPI backend is running."
       );
 
     } finally {
@@ -263,11 +292,50 @@ export default function DecisionHistory() {
   // INITIAL LOAD
   // ==========================================================
 
+  // ==========================================================
+  // LOAD EXECUTED DECISIONS
+  // ==========================================================
+
+  const loadDecisions = async () => {
+    try {
+      setDecisionsLoading(true);
+
+      const response = await fetch(
+        DECISIONS_API_URL
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Backend returned HTTP ${response.status}`
+        );
+      }
+
+      const result = await response.json();
+
+      setDecisions(
+        Array.isArray(result) ? result : []
+      );
+    } catch (err) {
+      console.error(
+        "Failed to load executed decisions:",
+        err
+      );
+
+      setDecisions([]);
+    } finally {
+      setDecisionsLoading(false);
+    }
+  };
+
+  // ==========================================================
+  // INITIAL LOAD
+  // ==========================================================
+
   useEffect(() => {
-    loadOutcomes();
+    // FIXED: loadHistory(), not loadOutcomes()
+    loadHistory();
     loadDecisions();
   }, []);
-
 
   // ==========================================================
   // FILTER RECORDS
@@ -279,57 +347,34 @@ export default function DecisionHistory() {
       search.trim().toLowerCase();
 
     return records.filter((record) => {
-
-      // ------------------------------------------------------
-      // Search
-      // ------------------------------------------------------
-
       const searchableText = [
-
         record.decision_id,
-
         record.shipment_id,
-
         record.product,
-
         record.origin,
-
         record.destination,
-
         record.recommended_action,
-
         record.selected_action,
-
         record.outcome_status,
-
         record.user_name,
-
       ]
         .map((value) =>
           String(value ?? "").toLowerCase()
         )
         .join(" ");
 
-
       const matchesSearch =
         !query ||
         searchableText.includes(query);
 
-
-      // ------------------------------------------------------
-      // Status filter
-      // ------------------------------------------------------
-
       let matchesStatus = true;
 
       if (filterStatus === "successful") {
-
         matchesStatus =
           Boolean(record.action_success);
       }
 
       if (filterStatus === "delayed") {
-
         matchesStatus =
           record.on_time === false ||
           String(
@@ -340,108 +385,123 @@ export default function DecisionHistory() {
       }
 
       if (filterStatus === "on-time") {
-
         matchesStatus =
           record.on_time === true;
       }
 
       if (filterStatus === "override") {
-
         matchesStatus =
           Boolean(record.manager_override);
       }
-
 
       return (
         matchesSearch &&
         matchesStatus
       );
     });
-
   }, [
     records,
     search,
     filterStatus,
   ]);
 
-
   // ==========================================================
   // KPI CALCULATIONS
   // ==========================================================
 
-  const totalDecisions =
-    records.length;
 
+  const successfulDecisions = records.filter(
+    (record) =>
+      Boolean(record.action_success)
+  ).length;
 
-  const successfulDecisions =
-    records.filter(
-      (record) =>
-        Boolean(record.action_success)
-    ).length;
+  const delayedShipments = records.filter(
+    (record) =>
+      record.on_time === false
+  ).length;
 
+  const onTimeDecisions = records.filter(
+    (record) =>
+      record.on_time === true
+  ).length;
 
-  const delayedShipments =
-    records.filter(
-      (record) =>
-        record.on_time === false
-    ).length;
+  const overrideDecisions = records.filter(
+    (record) =>
+      Boolean(record.manager_override)
+  ).length;
 
-
-  const onTimeDecisions =
-    records.filter(
-      (record) =>
-        record.on_time === true
-    ).length;
-
-
-  const overrideDecisions =
-    records.filter(
-      (record) =>
-        Boolean(record.manager_override)
-    ).length;
-
-
-  const totalSavings =
-    records.reduce(
-      (sum, record) =>
-        sum +
-        toNumber(
-          record.cost_saving
-        ),
-      0
-    );
-
+  const totalSavings = records.reduce(
+    (sum, record) =>
+      sum +
+      toNumber(record.cost_saving),
+    0
+  );
 
   const successRate =
     totalDecisions > 0
-      ? (
-          successfulDecisions /
-          totalDecisions
-        ) * 100
+      ? (successfulDecisions / totalDecisions) *
+        100
       : 0;
-
 
   const onTimeRate =
     totalDecisions > 0
-      ? (
-          onTimeDecisions /
-          totalDecisions
-        ) * 100
+      ? (onTimeDecisions / totalDecisions) *
+        100
       : 0;
-
 
   const overrideRate =
     totalDecisions > 0
-      ? (
-          overrideDecisions /
-          totalDecisions
-        ) * 100
+      ? (overrideDecisions / totalDecisions) *
+        100
       : 0;
 
+  // ============================================================
+  // CHART DATA
+  // ============================================================
 
-  // ==========================================================
+  const chartRecords = useMemo(() => {
+    return filteredRecords
+      .slice(0, 10)
+      .map((record) => ({
+        ...record,
+        decisionId:
+          record.decision_id ||
+          record.decisionId ||
+          "-",
+
+        expectedDelivery: toNumber(
+          firstValue(record, [
+            "expected_delivery_days",
+            "expectedDelivery",
+          ])
+        ),
+
+        actualDelivery: toNumber(
+          firstValue(record, [
+            "actual_delivery_days",
+            "actualDelivery",
+          ])
+        ),
+
+        expectedCost: toNumber(
+          firstValue(record, [
+            "expected_cost",
+            "expectedCost",
+          ])
+        ),
+
+        actualCost: toNumber(
+          firstValue(record, [
+            "actual_cost",
+            "actualCost",
+          ])
+        ),
+      }));
+  }, [filteredRecords]);
+
+  // ============================================================
   // RENDER
-  // ==========================================================
+  // ============================================================
 
   return (
 
@@ -768,22 +828,15 @@ export default function DecisionHistory() {
           background: #40370d;
         }
 
-
         .override-yes {
           color: #facc15;
           background: #40370d;
         }
 
-
         .override-no {
           color: #6ee7a0;
           background: #123b25;
         }
-
-
-        /* ==================================================
-           VALUES
-        ================================================== */
 
         .positive {
           color: #6ee7a0;
@@ -794,15 +847,9 @@ export default function DecisionHistory() {
           color: #ff8d8d;
         }
 
-
         .neutral {
           color: #9bb6d2;
         }
-
-
-        /* ==================================================
-           STATES
-        ================================================== */
 
         .loading-box,
         .error-box,
@@ -841,23 +888,20 @@ export default function DecisionHistory() {
           border-top: 1px solid #222;
         }
 
-
-        /* ==================================================
-           RESPONSIVE
-        ================================================== */
-
-        @media (max-width: 1200px) {
-
-          .kpi-grid {
-            grid-template-columns:
-              repeat(3, 1fr);
-          }
-
+        .chart-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 18px;
+          padding: 20px;
         }
 
+        .chart-title {
+          color: #8eb1d5;
+          font-size: 13px;
+          margin: 0 0 10px;
+        }
 
-        @media (max-width: 800px) {
-
+        @media (max-width: 1200px) {
           .kpi-grid {
             grid-template-columns:
               repeat(2, 1fr);
@@ -865,6 +909,18 @@ export default function DecisionHistory() {
 
         }
 
+        @media (max-width: 900px) {
+          .chart-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 800px) {
+          .kpi-grid {
+            grid-template-columns:
+              repeat(2, 1fr);
+          }
+        }
 
         @media (max-width: 600px) {
 
@@ -892,7 +948,6 @@ export default function DecisionHistory() {
         ================================================== */}
 
         <div className="history-header">
-
           <h1>
             Decision History
           </h1>
@@ -920,7 +975,6 @@ export default function DecisionHistory() {
           </div>
 
         </div>
-
 
         {/* ==================================================
             KPI CARDS
@@ -1012,53 +1066,264 @@ export default function DecisionHistory() {
             <p>Comparing expected outcomes against what actually happened, per decision</p>
           </div>
 
-          {filteredRecords.length === 0 ? (
-            <div className="empty-box">No outcome data yet to chart.</div>
+        {/* ==================================================
+            PREDICTED VS ACTUAL CHARTS
+        ================================================== */}
+
+        <div
+          className="records-card"
+          style={{
+            marginBottom: "22px",
+          }}
+        >
+          <div
+            className="records-header"
+          >
+            <h2>
+              Predicted vs Actual Performance
+            </h2>
+
+            <p>
+              Comparing expected outcomes against
+              what actually happened, per decision
+            </p>
+          </div>
+
+          {chartRecords.length === 0 ? (
+            <div className="empty-box">
+              No outcome data yet to chart.
+            </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px" }}>
+            <div className="chart-grid">
+
               <div>
-                <p style={{ color: "#8eb1d5", fontSize: "13px", marginBottom: "10px" }}>
-                  Delivery Days (Expected vs Actual)
+                <p className="chart-title">
+                  Delivery Days
+                  (Expected vs Actual)
                 </p>
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={filteredRecords.slice(0, 10)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#292929" />
-                    <XAxis dataKey="decisionId" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#8eb1d5" />
-                    <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #292929" }} />
+
+                <ResponsiveContainer
+                  width="100%"
+                  height={260}
+                >
+                  <BarChart
+                    data={chartRecords}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#292929"
+                    />
+
+                    <XAxis
+                      dataKey="decisionId"
+                      stroke="#8eb1d5"
+                      tick={{ fontSize: 10 }}
+                    />
+
+                    <YAxis
+                      stroke="#8eb1d5"
+                    />
+
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#111",
+                        border:
+                          "1px solid #292929",
+                      }}
+                    />
+
                     <Legend />
-                    <Bar dataKey="expectedDelivery" name="Expected Days" fill="#60a5fa" />
-                    <Bar dataKey="actualDelivery" name="Actual Days" fill="#c084fc" />
+
+                    <Bar
+                      dataKey="expectedDelivery"
+                      name="Expected Days"
+                      fill="#60a5fa"
+                    />
+
+                    <Bar
+                      dataKey="actualDelivery"
+                      name="Actual Days"
+                      fill="#c084fc"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
 
               <div>
-                <p style={{ color: "#8eb1d5", fontSize: "13px", marginBottom: "10px" }}>
-                  Cost (Expected vs Actual)
+                <p className="chart-title">
+                  Cost
+                  (Expected vs Actual)
                 </p>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={filteredRecords.slice(0, 10)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#292929" />
-                    <XAxis dataKey="decisionId" stroke="#8eb1d5" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#8eb1d5" />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "#111", border: "1px solid #292929" }}
-                      formatter={(value) => formatCurrency(value)}
+
+                <ResponsiveContainer
+                  width="100%"
+                  height={260}
+                >
+                  <LineChart
+                    data={chartRecords}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#292929"
                     />
+
+                    <XAxis
+                      dataKey="decisionId"
+                      stroke="#8eb1d5"
+                      tick={{ fontSize: 10 }}
+                    />
+
+                    <YAxis
+                      stroke="#8eb1d5"
+                    />
+
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#111",
+                        border:
+                          "1px solid #292929",
+                      }}
+                      formatter={(value) =>
+                        formatCurrency(value)
+                      }
+                    />
+
                     <Legend />
-                    <Line type="monotone" dataKey="expectedCost" name="Expected Cost" stroke="#60a5fa" strokeWidth={2} />
-                    <Line type="monotone" dataKey="actualCost" name="Actual Cost" stroke="#c084fc" strokeWidth={2} />
+
+                    <Line
+                      type="monotone"
+                      dataKey="expectedCost"
+                      name="Expected Cost"
+                      stroke="#60a5fa"
+                      strokeWidth={2}
+                    />
+
+                    <Line
+                      type="monotone"
+                      dataKey="actualCost"
+                      name="Actual Cost"
+                      stroke="#c084fc"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+
             </div>
           )}
         </div>
-        
-        {/* =====================================================
+
+        {/* ==================================================
             EXECUTED DECISIONS
-        ===================================================== */}
+        ================================================== */}
+
+        <div
+          className="records-card"
+          style={{
+            marginBottom: "22px",
+          }}
+        >
+          <div className="records-header">
+            <h2>
+              Executed Decisions
+            </h2>
+
+            <p>
+              Decisions recorded from the
+              prescription workflow
+            </p>
+          </div>
+
+          {decisionsLoading ? (
+            <div className="loading-box">
+              Loading executed decisions...
+            </div>
+          ) : decisions.length === 0 ? (
+            <div className="empty-box">
+              No decisions executed yet.
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table
+                style={{
+                  minWidth: "900px",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th>Decision ID</th>
+                    <th>Shipment ID</th>
+                    <th>Selected Option</th>
+                    <th>Cost</th>
+                    <th>Executed By</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {[...decisions]
+                    .sort(
+                      (a, b) =>
+                        new Date(b.created_at) -
+                        new Date(a.created_at)
+                    )
+                    .map((d) => (
+                      <tr key={d.id}>
+                        <td>
+                          <span className="decision-id">
+                            DEC-
+                            {String(d.id).padStart(
+                              4,
+                              "0"
+                            )}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className="shipment-id">
+                            {d.shipment_id}
+                          </span>
+                        </td>
+
+                        <td>
+                          {d.selected_option ||
+                            "-"}
+                        </td>
+
+                        <td>
+                          {formatCurrency(
+                            d.estimated_cost
+                          )}
+                        </td>
+
+                        <td>
+                          {d.user_name || "-"}
+                        </td>
+
+                        <td>
+                          <span className="status-badge status-success">
+                            {d.decision_status ||
+                              "Completed"}
+                          </span>
+                        </td>
+
+                        <td>
+                          {formatDate(
+                            d.created_at
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ==================================================
+            TOOLBAR
+        ================================================== */}
 
         <div className="records-card" style={{ marginBottom: "22px" }}>
           <div className="records-header">
@@ -1155,19 +1420,20 @@ export default function DecisionHistory() {
             <option value="override">
               Manager Override
             </option>
-
           </select>
 
 
           <button
             className="refresh-button"
-            onClick={loadHistory}
+            onClick={() => {
+              loadHistory();
+              loadDecisions();
+            }}
           >
             Refresh
           </button>
 
         </div>
-
 
         {/* ==================================================
             RECORDS
@@ -1223,234 +1489,111 @@ export default function DecisionHistory() {
             <>
 
               <div className="table-wrapper">
-
                 <table>
-
                   <thead>
 
                     <tr>
-
-                      <th>
-                        Decision ID
-                      </th>
-
-                      <th>
-                        Shipment ID
-                      </th>
-
-                      <th>
-                        Date
-                      </th>
-
-                      <th>
-                        Product
-                      </th>
-
-                      <th>
-                        Quantity
-                      </th>
-
-                      <th>
-                        Origin
-                      </th>
-
-                      <th>
-                        Destination
-                      </th>
-
-                      <th>
-                        Risk Score
-                      </th>
-
-                      <th>
-                        Recommended Action
-                      </th>
-
-                      <th>
-                        Selected Action
-                      </th>
-
-                      <th>
-                        Override
-                      </th>
-
-                      <th>
-                        Expected Delivery
-                      </th>
-
-                      <th>
-                        Actual Delivery
-                      </th>
-
-                      <th>
-                        Difference
-                      </th>
-
-                      <th>
-                        Expected Cost
-                      </th>
-
-                      <th>
-                        Actual Cost
-                      </th>
-
-                      <th>
-                        Cost Saving
-                      </th>
-
-                      <th>
-                        Status
-                      </th>
-
-                      <th>
-                        Notes
-                      </th>
-
+                      <th>Decision ID</th>
+                      <th>Shipment ID</th>
+                      <th>Date</th>
+                      <th>Product</th>
+                      <th>Quantity</th>
+                      <th>Origin</th>
+                      <th>Destination</th>
+                      <th>Risk Score</th>
+                      <th>Recommended Action</th>
+                      <th>Selected Action</th>
+                      <th>Override</th>
+                      <th>Expected Delivery</th>
+                      <th>Actual Delivery</th>
+                      <th>Difference</th>
+                      <th>Expected Cost</th>
+                      <th>Actual Cost</th>
+                      <th>Cost Saving</th>
+                      <th>Status</th>
+                      <th>Notes</th>
                     </tr>
 
                   </thead>
 
 
                   <tbody>
-
                     {filteredRecords.map(
                       (record) => {
-
                         const status =
                           getStatus(record);
-
-                        const difference =
-                          record.delivery_difference;
-
                         const riskClass =
-                          getRiskClass(
-                            record.risk_score
-                          );
+                          getRiskClass(record.risk_score);
+                        const difference =
+                          record.deliveryDifference;
 
                         return (
-
                           <tr
-                            key={
-                              `${record.decision_id}-${record.shipment_id}`
-                            }
+                            key={`${record.decision_id}-${record.shipment_id}`}
                           >
 
-                            {/* Decision ID */}
-
                             <td>
-
                               <span className="decision-id">
-
-                                {record.decision_id}
-
+                                {record.decision_id ||
+                                  "-"}
                               </span>
-
                             </td>
 
-
-                            {/* Shipment ID */}
-
                             <td>
-
                               <span className="shipment-id">
-
-                                {record.shipment_id}
-
+                                {record.shipment_id ||
+                                  "-"}
                               </span>
-
                             </td>
 
-
-                            {/* Date */}
-
                             <td>
-
                               {formatDateTime(
                                 record.decision_date
                               )}
-
                             </td>
 
-
-                            {/* Product */}
-
                             <td>
-
-                              {record.product || "-"}
-
+                              {record.product ||
+                                "-"}
                             </td>
 
-
-                            {/* Quantity */}
-
                             <td>
-
                               {formatNumber(
                                 record.quantity
                               )}
-
                             </td>
 
-
-                            {/* Origin */}
-
                             <td>
-
-                              {record.origin || "-"}
-
+                              {record.origin ||
+                                "-"}
                             </td>
 
-
-                            {/* Destination */}
-
                             <td>
-
-                              {record.destination || "-"}
-
+                              {record.destination ||
+                                "-"}
                             </td>
 
-
-                            {/* Risk */}
-
                             <td>
-
                               <span
                                 className={`risk-badge ${riskClass}`}
                               >
-
                                 {formatRisk(
                                   record.risk_score
                                 )}
-
                               </span>
-
                             </td>
 
-
-                            {/* Recommended Action */}
-
                             <td>
-
                               {record.recommended_action ||
                                 "-"}
-
                             </td>
 
-
-                            {/* Selected Action */}
-
                             <td>
-
                               {record.selected_action ||
                                 "-"}
-
                             </td>
 
-
-                            {/* Override */}
-
                             <td>
-
                               <span
                                 className={`override-badge ${
                                   record.manager_override
@@ -1458,52 +1601,36 @@ export default function DecisionHistory() {
                                     : "override-no"
                                 }`}
                               >
-
                                 {record.manager_override
                                   ? "Yes"
                                   : "No"}
-
                               </span>
-
                             </td>
 
-
-                            {/* Expected Delivery */}
-
                             <td>
-
                               {record.expected_delivery_days !==
-                              null &&
+                                null &&
                               record.expected_delivery_days !==
-                              undefined
+                                undefined
                                 ? `${record.expected_delivery_days} days`
                                 : "-"}
-
                             </td>
 
-
-                            {/* Actual Delivery */}
-
                             <td>
-
                               {record.actual_delivery_days !==
-                              null &&
+                                null &&
                               record.actual_delivery_days !==
-                              undefined
+                                undefined
                                 ? `${record.actual_delivery_days} days`
                                 : "-"}
-
                             </td>
 
-
-                            {/* Delivery Difference */}
-
                             <td>
-
                               <span
                                 className={
                                   difference === null ||
-                                  difference === undefined
+                                  difference ===
+                                    undefined
                                     ? "neutral"
                                     : difference > 0
                                     ? "negative"
@@ -1512,53 +1639,42 @@ export default function DecisionHistory() {
                                     : "neutral"
                                 }
                               >
-
-                                {difference === null ||
-                                difference === undefined
+                                {difference ===
+                                  null ||
+                                difference ===
+                                  undefined
                                   ? "-"
-                                  : `${difference > 0 ? "+" : ""}${difference} days`}
-
+                                  : `${
+                                      difference > 0
+                                        ? "+"
+                                        : ""
+                                    }${difference} days`}
                               </span>
-
                             </td>
 
-
-                            {/* Expected Cost */}
-
                             <td>
-
                               {record.expected_cost !==
-                              null &&
+                                null &&
                               record.expected_cost !==
-                              undefined
+                                undefined
                                 ? formatCurrency(
                                     record.expected_cost
                                   )
                                 : "-"}
-
                             </td>
 
-
-                            {/* Actual Cost */}
-
                             <td>
-
                               {record.actual_cost !==
-                              null &&
+                                null &&
                               record.actual_cost !==
-                              undefined
+                                undefined
                                 ? formatCurrency(
                                     record.actual_cost
                                   )
                                 : "-"}
-
                             </td>
 
-
-                            {/* Cost Saving */}
-
                             <td>
-
                               <span
                                 className={
                                   record.cost_saving ===
@@ -1566,12 +1682,12 @@ export default function DecisionHistory() {
                                   record.cost_saving ===
                                     undefined
                                     ? "neutral"
-                                    : record.cost_saving >= 0
+                                    : record.cost_saving >=
+                                      0
                                     ? "positive"
                                     : "negative"
                                 }
                               >
-
                                 {record.cost_saving ===
                                   null ||
                                 record.cost_saving ===
@@ -1580,46 +1696,28 @@ export default function DecisionHistory() {
                                   : formatCurrency(
                                       record.cost_saving
                                     )}
-
                               </span>
-
                             </td>
 
-
-                            {/* Status */}
-
                             <td>
-
                               <span
                                 className={`status-badge ${status.className}`}
                               >
-
                                 {status.text}
-
                               </span>
-
                             </td>
 
-
-                            {/* Notes */}
-
                             <td>
-
-                              {record.notes || "-"}
-
+                              {record.notes ||
+                                "-"}
                             </td>
 
                           </tr>
-
                         );
-
                       }
                     )}
-
                   </tbody>
-
                 </table>
-
               </div>
 
 
@@ -1628,7 +1726,6 @@ export default function DecisionHistory() {
               ================================================== */}
 
               <div className="table-footer">
-
                 Showing{" "}
                 {filteredRecords.length}{" "}
                 of{" "}
@@ -1644,7 +1741,6 @@ export default function DecisionHistory() {
 
                 Override Rate:{" "}
                 {overrideRate.toFixed(1)}%
-
               </div>
 
             </>
