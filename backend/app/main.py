@@ -1,9 +1,5 @@
-# ============================================================
-# SUPPLY PRESCRIPT
-# Backend Entry Point
-# ============================================================
-
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -25,13 +21,20 @@ from .models import (
     Prediction,
     Prescription,
     Decision,
-    Outcome
+    Outcome,
 )
 
-from scripts.seed_database import seed_database
+
+# ============================================================
+# APPLICATION LIFESPAN
+# ============================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
+    print("=" * 60)
+    print("SUPPLY PRESCRIPT BACKEND")
+    print("=" * 60)
 
     print("Creating database tables...")
 
@@ -39,27 +42,56 @@ async def lifespan(app: FastAPI):
         bind=engine
     )
 
-    seed_database()
+    print("Database tables ready.")
+    print("=" * 60)
 
-    print("Database tables and sample data ready.")
+    # IMPORTANT:
+    # DO NOT call seed_database() here.
+    #
+    # Seeding here would delete Decisions and Outcomes
+    # every time FastAPI restarts.
 
     yield
 
+    print("SupplyPrescript backend shutting down...")
+
+
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
+
 app = FastAPI(
     title="SupplyPrescript API",
-    description="Backend API for SupplyPrescript",
+    description=(
+        "Backend API for SupplyPrescript"
+    ),
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+# ============================================================
+# CORS
+# ============================================================
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
+
+
+# ============================================================
+# ROUTERS
+# ============================================================
 
 app.include_router(
     shipments.router
@@ -85,53 +117,107 @@ app.include_router(
     prescriptions.router
 )
 
+
+# ============================================================
+# DECISIONS
+# ============================================================
+
 app.include_router(
-    decisions.router
+    decisions.router,
+    prefix="/api/decisions",
 )
+
+
+# ============================================================
+# OUTCOMES
+# ============================================================
 
 app.include_router(
     outcomes.router,
-    prefix="/api/outcomes"
+    prefix="/api/outcomes",
 )
+
+
+# ============================================================
+# ROI
+# ============================================================
 
 app.include_router(
     roi.router,
-    prefix="/api/roi"
+    prefix="/api/roi",
 )
 
 
+# ============================================================
+# ROOT
+# ============================================================
+
 @app.get("/")
 def root():
+
     return {
-        "message": "SupplyPrescript Backend is running"
+        "message":
+            "SupplyPrescript Backend is running"
     }
 
 
+# ============================================================
+# HEALTH
+# ============================================================
+
 @app.get("/health")
 def health():
+
     return {
         "status": "healthy"
     }
 
 
-# -------------------------
-# API Information
-# -------------------------
+# ============================================================
+# API INFORMATION
+# ============================================================
 
 @app.get("/api")
 def api_information():
+
     return {
-        "project": "SupplyPrescript",
-        "module": "Backend + Closed-Loop Analytics",
+
+        "project":
+            "SupplyPrescript",
+
+        "module":
+            "Backend + Closed-Loop Analytics",
+
         "endpoints": {
-            "shipments": "/shipments",
-            "database": "/database",
-            "suppliers": "/suppliers",
-            "operations": "/operations",
-            "predictions": "/predictions",
-            "decisions": "/decisions",
-            "prescriptions": "/prescriptions",
-            "outcomes": "/api/outcomes",
-            "roi": "/api/roi"
-        }
+
+            "shipments":
+                "/shipments",
+
+            "database":
+                "/database",
+
+            "suppliers":
+                "/suppliers",
+
+            "operations":
+                "/operations",
+
+            "predictions":
+                "/predictions",
+
+            "prescriptions":
+                "/prescriptions",
+
+            "decisions":
+                "/api/decisions",
+
+            "outcomes":
+                "/api/outcomes",
+
+            "decision_history":
+                "/api/outcomes/history",
+
+            "roi":
+                "/api/roi",
+        },
     }

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pathlib import Path
 import pandas as pd
 
+
 router = APIRouter(
     tags=["Decisions"]
 )
@@ -33,6 +34,9 @@ def load_outcome_data():
             detail=f"Failed to read decision outcome dataset: {str(e)}"
         )
 
+        existing_outcome.actual_delivery_days = (
+            outcome.actual_delivery_days
+        )
 
 @router.get("/")
 def get_outcomes():
