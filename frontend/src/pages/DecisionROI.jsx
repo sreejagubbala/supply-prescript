@@ -17,7 +17,7 @@ import {
 
 // ============================================================
 // Supply Prescript — Member 5: Closed-Loop & Analytics
-// Decision ROI
+// Decision ROI Page
 // ============================================================
 
 const API_URL = "http://127.0.0.1:8000/api/roi/";
@@ -25,7 +25,7 @@ const ACTION_API_URL = "http://127.0.0.1:8000/api/roi/by-action";
 const MARKET_API_URL = "http://127.0.0.1:8000/api/roi/by-market";
 
 // ============================================================
-// COLORS
+// COLORS 
 // ============================================================
 
 const COLORS = {
