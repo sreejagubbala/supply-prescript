@@ -12,7 +12,6 @@ const mockKpis = [
   { label: 'On-Time', value: 96, icon: CheckCircle, color: 'green' },
   { label: 'Delayed', value: 32, icon: AlertTriangle, color: 'red' },
 ]
-
 const mockTrendData = [
   { day: 'Mon', delays: 4 },
   { day: 'Tue', delays: 7 },
