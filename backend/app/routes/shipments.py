@@ -11,42 +11,82 @@ router = APIRouter(
     tags=["Shipments"]
 )
 
-# Common dashboard dataset
+# ============================================================
+# COMMON DASHBOARD DATASET
+# ============================================================
+# Operations and ROI already use this file.
+# Shipments will now use the same 20-row dataset.
 BASE_DIR = Path(__file__).resolve().parents[3]
-OUTCOME_FILE = BASE_DIR / "data" / "processed" / "decision_outcomes.csv"
+
+OUTCOME_FILE = (
+    BASE_DIR
+    / "data"
+    / "processed"
+    / "decision_outcomes.csv"
+)
 
 
+# ============================================================
+# GET ALL SHIPMENTS
+# ============================================================
 @router.get(
     "/",
     response_model=list[ShipmentResponse]
 )
-def get_shipments(
-    db=Depends(get_db)
-):
-    shipments = (
-        db.query(Shipment)
-        .order_by(Shipment.id)
-        .all()
-    )
+def get_shipments():
 
-    return [
-        {
-            "id": shipment.id,
-            "origin": shipment.origin,
-            "destination": shipment.destination,
-            "status": shipment.status,
-            "eta": shipment.eta,
-            "riskScore": shipment.risk_score
-        }
-        for shipment in shipments
-    ]
+    if not OUTCOME_FILE.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="Decision outcome dataset not found"
+        )
+
+    df = pd.read_csv(OUTCOME_FILE)
+
+    shipments = []
+
+    for index, row in df.iterrows():
+
+        # Convert On_Time value into frontend status
+        on_time = (
+            str(row["On_Time"]).strip().lower()
+            in ["true", "1", "yes"]
+        )
+
+        status = "On-Time" if on_time else "Delayed"
+
+        shipments.append(
+            {
+                # ShipmentResponse requires integer ID.
+                # Keep numeric 1-20 for compatibility.
+                "id": index + 1,
+
+                # Common dataset fields
+                "origin": str(row["Customer_City"]),
+                "destination": str(row["Order_Region"]),
+                "status": status,
+                "eta": str(row["Decision_Date"]),
+                "riskScore": float(row["Late_delivery_risk"])
+            }
+        )
+
+    return shipments
 
 
+# ============================================================
+# GET SINGLE SHIPMENT
+# ============================================================
 @router.get(
     "/{shipment_id}",
     response_model=ShipmentResponse
 )
 def get_shipment(shipment_id: int):
+
+    if not OUTCOME_FILE.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="Decision outcome dataset not found"
+        )
 
     df = pd.read_csv(OUTCOME_FILE)
 
@@ -58,22 +98,28 @@ def get_shipment(shipment_id: int):
 
     row = df.iloc[shipment_id - 1]
 
-    on_time = str(row["On_Time"]).lower() in ["true", "1", "yes"]
+    on_time = (
+        str(row["On_Time"]).strip().lower()
+        in ["true", "1", "yes"]
+    )
 
-    status = "On Track" if on_time else "At Risk"
-
-    risk_score = float(row["Late_delivery_risk"])
+    status = "On-Time" if on_time else "Delayed"
 
     return {
         "id": shipment_id,
         "origin": str(row["Customer_City"]),
         "destination": str(row["Order_Region"]),
         "status": status,
-        "eta": None,
-        "riskScore": risk_score
+        "eta": str(row["Decision_Date"]),
+        "riskScore": float(row["Late_delivery_risk"])
     }
 
 
+# ============================================================
+# CREATE SHIPMENT
+# ============================================================
+# Kept unchanged so your existing database functionality
+# continues to work for newly created shipments.
 @router.post(
     "/",
     response_model=ShipmentResponse,
@@ -81,7 +127,7 @@ def get_shipment(shipment_id: int):
 )
 def create_shipment(
     shipment_data: ShipmentCreate,
-    db = Depends(get_db)
+    db=Depends(get_db)
 ):
 
     existing_shipment = (

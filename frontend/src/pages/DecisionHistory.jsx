@@ -18,7 +18,7 @@ import {
 // Decision History
 // ============================================================
 
-const API_URL = "http://127.0.0.1:8000/api/outcomes/api/outcomes/";
+const API_URL = "http://127.0.0.1:8000/api/outcomes/";
 const DECISIONS_API_URL = "http://127.0.0.1:8000/api/decisions/";
 
 // ------------------------------------------------------------

@@ -3,28 +3,7 @@ import { Search, X, ArrowUp, ArrowDown, Download } from 'lucide-react'
 import { fetchShipments } from '../api/shipments'
 import { useNavigate } from 'react-router-dom'
 
-const mockShipments = [
-  { id: 'SHP-001', origin: 'Chennai', destination: 'Bengaluru', status: 'On-Time', eta: '2026-08-28', riskScore: 12 },
-  { id: 'SHP-002', origin: 'Mumbai', destination: 'Delhi', status: 'Delayed', eta: '2026-08-29', riskScore: 78 },
-  { id: 'SHP-003', origin: 'Hyderabad', destination: 'Pune', status: 'On-Time', eta: '2026-08-27', riskScore: 20 },
-  { id: 'SHP-004', origin: 'Kolkata', destination: 'Chennai', status: 'Delayed', eta: '2026-08-30', riskScore: 85 },
-  { id: 'SHP-005', origin: 'Delhi', destination: 'Mumbai', status: 'On-Time', eta: '2026-08-28', riskScore: 15 },
-  { id: 'SHP-006', origin: 'Pune', destination: 'Bengaluru', status: 'Delayed', eta: '2026-08-31', riskScore: 65 },
-  { id: 'SHP-007', origin: 'Chennai', destination: 'Hyderabad', status: 'On-Time', eta: '2026-08-27', riskScore: 8 },
-  { id: 'SHP-008', origin: 'Bengaluru', destination: 'Delhi', status: 'Delayed', eta: '2026-09-01', riskScore: 91 },
-  { id: 'SHP-009', origin: 'Mumbai', destination: 'Pune', status: 'On-Time', eta: '2026-08-28', riskScore: 25 },
-  { id: 'SHP-010', origin: 'Delhi', destination: 'Kolkata', status: 'Delayed', eta: '2026-08-30', riskScore: 55 },
-  { id: 'SHP-011', origin: 'Pune', destination: 'Mumbai', status: 'On-Time', eta: '2026-08-29', riskScore: 18 },
-  { id: 'SHP-012', origin: 'Bengaluru', destination: 'Chennai', status: 'On-Time', eta: '2026-08-27', riskScore: 10 },
-  { id: 'SHP-013', origin: 'Ahmedabad', destination: 'Surat', status: 'On-Time', eta: '2026-08-29', riskScore: 22 },
-  { id: 'SHP-014', origin: 'Jaipur', destination: 'Delhi', status: 'Delayed', eta: '2026-09-02', riskScore: 72 },
-  { id: 'SHP-015', origin: 'Chennai', destination: 'Coimbatore', status: 'On-Time', eta: '2026-08-28', riskScore: 5 },
-  { id: 'SHP-016', origin: 'Lucknow', destination: 'Kanpur', status: 'Delayed', eta: '2026-08-31', riskScore: 60 },
-  { id: 'SHP-017', origin: 'Bengaluru', destination: 'Mysuru', status: 'On-Time', eta: '2026-08-27', riskScore: 14 },
-  { id: 'SHP-018', origin: 'Mumbai', destination: 'Nagpur', status: 'Delayed', eta: '2026-09-01', riskScore: 88 },
-  { id: 'SHP-019', origin: 'Kolkata', destination: 'Bhubaneswar', status: 'On-Time', eta: '2026-08-30', riskScore: 30 },
-  { id: 'SHP-020', origin: 'Delhi', destination: 'Chandigarh', status: 'Delayed', eta: '2026-09-03', riskScore: 95 },
-]
+
 
 const ROWS_PER_PAGE = 20
 const HIGH_RISK_THRESHOLD = 70
@@ -103,16 +82,21 @@ function Shipments() {
   const [dateTo, setDateTo] = useState('')
 
       useEffect(() => {
-    fetchShipments()
-      .then((data) => {
-        const list = Array.isArray(data) ? data : data.shipments || []
-        setShipments(list.map(normalizeShipment))
-      })
-      .catch(() => {
-        console.warn('Backend not available yet — using mock data')
-        setShipments(mockShipments.map(normalizeShipment))
-      })
-  }, [])
+  fetchShipments()
+    .then((data) => {
+      const list = Array.isArray(data)
+        ? data
+        : data.shipments || []
+
+      setShipments(list.map(normalizeShipment))
+    })
+    .catch((error) => {
+      console.error('Failed to load shipments:', error)
+
+      // Do not display fake/mock shipment data.
+      setShipments([])
+    })
+}, [])
 
     const filtered = shipments.filter((s) => {
     const matchesStatus = statusFilter === 'All' || s.status === statusFilter

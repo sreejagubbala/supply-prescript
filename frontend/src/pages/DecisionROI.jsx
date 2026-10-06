@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -16,1475 +15,1381 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-import { useNavigate } from "react-router-dom";
+// ============================================================
+// Supply Prescript — Member 5: Closed-Loop & Analytics
+// Decision ROI Page
+// ============================================================
+
+const API_URL = "http://127.0.0.1:8000/api/roi/";
+const ACTION_API_URL = "http://127.0.0.1:8000/api/roi/by-action";
+const MARKET_API_URL = "http://127.0.0.1:8000/api/roi/by-market";
 
 // ============================================================
-// API
-// ============================================================
-
-const API_BASE_URL = "http://127.0.0.1:8000";
-
-// ============================================================
-// COLORS
+// COLORS 
 // ============================================================
 
 const COLORS = {
-  background: "#070d19",
-  card: "#1f2b3d",
-  cardSecondary: "#172235",
-  border: "#334155",
+  bg: "#0b1120",
+  panel: "#111827",
+  panel2: "#151f32",
+  border: "#253247",
+  text: "#f8fafc",
+  muted: "#94a3b8",
 
-  purple: "#a020f0",
-  purpleLight: "#b23cff",
+  blue: "#60A5FA",
+  green: "#34D399",
+  red: "#F87171",
+  yellow: "#B8A06A",
+  purple: "#A78BFA",
+  cyan: "#67B7C7",
+  orange: "#B97858",
 
-  green: "#00e676",
-  red: "#ff4d5d",
+  // Expected vs Actual Cost
+  expectedPink: "#E78AC3",
+  actualBlue: "#60A5FA",
 
-  text: "#f1f5f9",
-  secondaryText: "#94a3b8",
-  mutedText: "#64748b",
+  // Prescription Action Performance
+  actionBlue: "#6FA8DC",
+  actionGreen: "#7FBF9B",
+  actionPurple: "#9B8FC4",
 };
 
 // ============================================================
-// NUMBER FORMAT
+// COMMON STYLES
 // ============================================================
 
-function number(value) {
-  const parsed = Number(value);
+const cardStyle = {
+  background: COLORS.panel,
+  border: `1px solid ${COLORS.border}`,
+  borderRadius: 14,
+};
 
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
+const sectionTitle = {
+  margin: 0,
+  fontSize: 16,
+};
+
+const sectionSubtitle = {
+  margin: "6px 0 0",
+  color: COLORS.muted,
+  fontSize: 12,
+};
+
+const tooltipStyle = {
+  background: COLORS.panel2,
+  border: `1px solid ${COLORS.border}`,
+  borderRadius: 8,
+  color: COLORS.text,
+};
+
+const buttonStyle = {
+  background: COLORS.panel,
+  border: `1px solid ${COLORS.border}`,
+  color: COLORS.text,
+  borderRadius: 9,
+  padding: "10px 16px",
+  cursor: "pointer",
+  fontWeight: 600,
+};
 
 // ============================================================
-// CURRENCY
+// HELPERS
 // ============================================================
 
-function currency(value) {
-  return `₹${number(value).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
+const asNumber = (value, fallback = 0) => {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const formatMoney = (value) =>
+  `₹${asNumber(value).toLocaleString("en-IN", {
     maximumFractionDigits: 2,
   })}`;
+
+const formatNumber = (value) =>
+  asNumber(value).toLocaleString("en-IN");
+
+const formatPercent = (value) =>
+  `${asNumber(value).toFixed(1)}%`;
+
+function normalizeResponse(data) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items;
+  }
+
+  if (Array.isArray(data?.records)) {
+    return data.records;
+  }
+
+  if (Array.isArray(data?.actions)) {
+    return data.actions;
+  }
+
+  if (Array.isArray(data?.markets)) {
+    return data.markets;
+  }
+
+  return [];
+}
+
+function getField(row, ...names) {
+  for (const name of names) {
+    if (
+      row?.[name] !== undefined &&
+      row?.[name] !== null &&
+      row?.[name] !== ""
+    ) {
+      return row[name];
+    }
+  }
+
+  return null;
 }
 
 // ============================================================
-// DECISION ROI
+// MAIN COMPONENT
 // ============================================================
 
-function DecisionROI() {
-  const navigate = useNavigate();
-
-  const [summary, setSummary] = useState(null);
-  const [actionData, setActionData] = useState([]);
-  const [marketData, setMarketData] = useState([]);
+export default function DecisionROI() {
+  const [summary, setSummary] = useState({});
+  const [actionRows, setActionRows] = useState([]);
+  const [marketRows, setMarketRows] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   // ==========================================================
-  // LOAD ROI DATA
+  // LOAD DATA
   // ==========================================================
 
-  useEffect(() => {
-    async function loadROIData() {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    const [
+      summaryResult,
+      actionResult,
+      marketResult,
+    ] = await Promise.allSettled([
+      fetch(API_URL),
+      fetch(ACTION_API_URL),
+      fetch(MARKET_API_URL),
+    ]);
+
+    // ========================================================
+    // ROI SUMMARY
+    // ========================================================
+
+    if (summaryResult.status === "fulfilled") {
       try {
-        setLoading(true);
-        setError("");
+        const response = summaryResult.value;
 
-        const [
-          summaryResponse,
-          actionResponse,
-          marketResponse,
-        ] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/roi/`),
-          fetch(`${API_BASE_URL}/api/roi/by-action`),
-          fetch(`${API_BASE_URL}/api/roi/by-market`),
-        ]);
-
-        if (!summaryResponse.ok) {
-          throw new Error("Unable to load ROI summary.");
+        if (!response.ok) {
+          throw new Error(
+            `ROI API returned HTTP ${response.status}`
+          );
         }
 
-        if (!actionResponse.ok) {
-          throw new Error("Unable to load ROI by action.");
-        }
+        const data = await response.json();
 
-        if (!marketResponse.ok) {
-          throw new Error("Unable to load ROI by market.");
-        }
-
-        const summaryResult =
-          await summaryResponse.json();
-
-        const actionResult =
-          await actionResponse.json();
-
-        const marketResult =
-          await marketResponse.json();
-
-        setSummary(summaryResult);
-
-        setActionData(
-          Array.isArray(actionResult.data)
-            ? actionResult.data
-            : []
-        );
-
-        setMarketData(
-          Array.isArray(marketResult.data)
-            ? marketResult.data
-            : []
-        );
+        setSummary(data || {});
       } catch (err) {
-        console.error("ROI Error:", err);
+        console.error(
+          "Failed to load ROI summary:",
+          err
+        );
+
+        setSummary({});
 
         setError(
-          "Unable to connect to the Closed-Loop Analytics backend."
+          "Unable to load ROI summary. Check that the FastAPI backend is running."
         );
-      } finally {
-        setLoading(false);
       }
+    } else {
+      console.error(
+        "Failed to request ROI summary:",
+        summaryResult.reason
+      );
+
+      setSummary({});
+
+      setError(
+        "Could not connect to the ROI API."
+      );
     }
 
-    loadROIData();
+    // ========================================================
+    // ACTION DATA
+    // ========================================================
+
+    if (actionResult.status === "fulfilled") {
+      try {
+        const response = actionResult.value;
+
+        if (!response.ok) {
+          throw new Error(
+            `Action API returned HTTP ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        setActionRows(
+          normalizeResponse(data)
+        );
+      } catch (err) {
+        console.error(
+          "Failed to load action ROI:",
+          err
+        );
+
+        setActionRows([]);
+      }
+    } else {
+      setActionRows([]);
+    }
+
+    // ========================================================
+    // MARKET DATA
+    // ========================================================
+
+    if (marketResult.status === "fulfilled") {
+      try {
+        const response = marketResult.value;
+
+        if (!response.ok) {
+          throw new Error(
+            `Market API returned HTTP ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        setMarketRows(
+          normalizeResponse(data)
+        );
+      } catch (err) {
+        console.error(
+          "Failed to load market ROI:",
+          err
+        );
+
+        setMarketRows([]);
+      }
+    } else {
+      setMarketRows([]);
+    }
+
+    setLoading(false);
   }, []);
 
   // ==========================================================
-  // LOADING
+  // INITIAL LOAD
   // ==========================================================
 
-  if (loading) {
-    return (
-      <div className="roi-page loading-page">
-        <style>{`
-
-          * {
-            box-sizing: border-box;
-          }
-
-          .loading-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: ${COLORS.background};
-            color: ${COLORS.text};
-            font-family: Arial, Helvetica, sans-serif;
-          }
-
-          .loading-box {
-            background: ${COLORS.card};
-            padding: 40px;
-            border-radius: 14px;
-            border: 1px solid ${COLORS.border};
-            text-align: center;
-          }
-
-          .loading-spinner {
-            font-size: 35px;
-            margin-bottom: 12px;
-            color: ${COLORS.purple};
-          }
-
-          .loading-box h2 {
-            margin: 0 0 8px;
-            color: ${COLORS.text};
-          }
-
-          .loading-box p {
-            margin: 0;
-            color: ${COLORS.secondaryText};
-          }
-
-        `}</style>
-
-        <div className="loading-box">
-
-          <div className="loading-spinner">
-            ⟳
-          </div>
-
-          <h2>
-            Loading Decision ROI...
-          </h2>
-
-          <p>
-            Reading closed-loop analytics from backend
-          </p>
-
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ==========================================================
-  // ERROR
+  // SUMMARY VALUES
   // ==========================================================
 
-  if (error) {
-    return (
-      <div className="roi-page error-page">
-        <style>{`
+  const metrics = useMemo(() => {
+    return {
+      totalDecisions: getField(
+        summary,
+        "total_decisions",
+        "totalDecisions",
+        "decisions"
+      ),
 
-          * {
-            box-sizing: border-box;
-          }
+      expectedCost: getField(
+        summary,
+        "expected_cost",
+        "expectedCost"
+      ),
 
-          .error-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: ${COLORS.background};
-            font-family: Arial, Helvetica, sans-serif;
-          }
+      actualCost: getField(
+        summary,
+        "actual_cost",
+        "actualCost"
+      ),
 
-          .error-box {
-            width: min(600px, 90%);
-            padding: 30px;
-            background: ${COLORS.card};
-            border: 1px solid ${COLORS.red};
-            border-radius: 14px;
-            text-align: center;
-          }
+      savings: getField(
+        summary,
+        "savings",
+        "cost_saving",
+        "total_savings"
+      ),
 
-          .error-box h2 {
-            color: ${COLORS.red};
-            margin-top: 0;
-          }
+      roi: getField(
+        summary,
+        "roi_percentage",
+        "roi",
+        "ROI"
+      ),
 
-          .error-box p {
-            color: ${COLORS.secondaryText};
-          }
+      successRate: getField(
+        summary,
+        "success_rate",
+        "successRate"
+      ),
 
-          .error-help {
-            font-size: 13px;
-          }
-
-          .error-actions {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
-          }
-
-          .retry-button,
-          .back-home-button {
-            border: none;
-            border-radius: 8px;
-            padding: 11px 17px;
-            cursor: pointer;
-            font-weight: 600;
-          }
-
-          .retry-button {
-            background: ${COLORS.purple};
-            color: white;
-          }
-
-          .retry-button:hover {
-            background: ${COLORS.purpleLight};
-          }
-
-          .back-home-button {
-            background: #334155;
-            color: ${COLORS.text};
-          }
-
-          .back-home-button:hover {
-            background: #475569;
-          }
-
-        `}</style>
-
-        <div className="error-box">
-
-          <h2>
-            ROI Data Error
-          </h2>
-
-          <p>
-            {error}
-          </p>
-
-          <p className="error-help">
-            Make sure the FastAPI backend is running on
-            port 8000 and decision outcome data exists.
-          </p>
-
-          <div className="error-actions">
-
-            <button
-              className="retry-button"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </button>
-
-            <button
-              className="back-home-button"
-              onClick={() => navigate("/")}
-            >
-              ← Back to Home
-            </button>
-
-          </div>
-
-        </div>
-      </div>
-    );
-  }
+      onTimeRate: getField(
+        summary,
+        "on_time_rate",
+        "onTimeRate"
+      ),
+    };
+  }, [summary]);
 
   // ==========================================================
-  // SAFE SUMMARY VALUES
+  // ACTION CHART DATA
   // ==========================================================
 
-  const totalDecisions =
-    number(summary?.total_decisions);
-
-  const expectedCost =
-    number(summary?.expected_cost);
-
-  const actualCost =
-    number(summary?.actual_cost);
-
-  const savings =
-    number(summary?.savings);
-
-  const roiPercentage =
-    number(summary?.roi_percentage);
-
-  const successRate =
-    number(summary?.success_rate);
-
-  const onTimeRate =
-    number(summary?.on_time_rate);
-
-  // ==========================================================
-  // DELIVERY DATA
-  // ==========================================================
-
-  const deliveryData = [
-    {
-      name: "On Time",
-      value: onTimeRate,
-    },
-    {
-      name: "Delayed",
-      value: Math.max(0, 100 - onTimeRate),
-    },
-  ];
-
-  // ==========================================================
-  // ACTION DATA
-  // ==========================================================
-
-  const formattedActionData =
-    actionData.map((item) => ({
+  const formattedActionData = useMemo(() => {
+    return actionRows.map((row, index) => ({
       action:
-        item.Selected_Action ||
-        item.selected_action ||
-        item.Recommended_Action ||
-        item.recommended_action ||
-        "Unknown",
+        getField(
+          row,
+          "Selected_Action",
+          "selected_action",
+          "Recommended_Action",
+          "recommended_action",
+          "action"
+        ) || `Action ${index + 1}`,
 
-      successRate:
-        number(item.success_rate),
+      successRate: asNumber(
+        getField(
+          row,
+          "success_rate",
+          "Success_Rate",
+          "successRate"
+        )
+      ),
+
+      decisions: asNumber(
+        getField(
+          row,
+          "total_decisions",
+          "decisions",
+          "count"
+        )
+      ),
     }));
+  }, [actionRows]);
 
   // ==========================================================
   // MARKET DATA
   // ==========================================================
 
-  const formattedMarketData =
-    marketData.map((item) => ({
+  const formattedMarketData = useMemo(() => {
+    return marketRows.map((row, index) => ({
       market:
-        item.Market ||
-        item.market ||
-        "Unknown",
+        getField(
+          row,
+          "Market",
+          "market",
+          "name"
+        ) || `Market ${index + 1}`,
 
-      savings:
-        number(item.savings),
+      savings: asNumber(
+        getField(
+          row,
+          "savings",
+          "Savings",
+          "cost_saving"
+        )
+      ),
     }));
+  }, [marketRows]);
 
   // ==========================================================
-  // MAIN PAGE
+  // DELIVERY DATA
+  // ==========================================================
+
+  const deliveryData = useMemo(() => {
+    const onTime = asNumber(
+      metrics.onTimeRate
+    );
+
+    return [
+      {
+        name: "On Time",
+        value: onTime,
+      },
+      {
+        name: "Delayed",
+        value: Math.max(
+          0,
+          100 - onTime
+        ),
+      },
+    ];
+  }, [metrics.onTimeRate]);
+
+  // ==========================================================
+  // COST DATA
+  // ==========================================================
+
+  const costData = useMemo(() => {
+    return [
+      {
+        name: "Expected Cost",
+        value: asNumber(
+          metrics.expectedCost
+        ),
+      },
+      {
+        name: "Actual Cost",
+        value: asNumber(
+          metrics.actualCost
+        ),
+      },
+    ];
+  }, [
+    metrics.expectedCost,
+    metrics.actualCost,
+  ]);
+
+  // ==========================================================
+  // PAGE
   // ==========================================================
 
   return (
-    <div className="roi-page">
-
-      <style>{`
-
-        * {
-          box-sizing: border-box;
-        }
-
-        /* =====================================================
-           PAGE
-           ===================================================== */
-
-        .roi-page {
-          min-height: 100vh;
-          padding: 28px;
-          background: ${COLORS.background};
-          color: ${COLORS.text};
-          font-family: Arial, Helvetica, sans-serif;
-        }
-
-        /* =====================================================
-           HEADER
-           ===================================================== */
-
-        .roi-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 25px;
-          gap: 20px;
-        }
-
-        .roi-header h1 {
-          margin: 0 0 8px;
-          font-size: 30px;
-          color: ${COLORS.text};
-        }
-
-        .roi-header p {
-          margin: 0;
-          color: ${COLORS.secondaryText};
-          font-size: 15px;
-        }
-
-        .roi-header-actions {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-
-        /* =====================================================
-           STATUS
-           ===================================================== */
-
-        .roi-status {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 14px;
-          background: ${COLORS.card};
-          border: 1px solid ${COLORS.border};
-          border-radius: 8px;
-          color: ${COLORS.text};
-          font-size: 14px;
-          font-weight: 600;
-        }
-
-        .status-dot {
-          width: 9px;
-          height: 9px;
-          background: ${COLORS.green};
-          border-radius: 50%;
-          box-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
-        }
-
-        /* =====================================================
-           BUTTON
-           ===================================================== */
-
-        .back-home-button {
-          border: none;
-          border-radius: 8px;
-          padding: 11px 17px;
-          background: ${COLORS.purple};
-          color: white;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: 0.2s;
-        }
-
-        .back-home-button:hover {
-          background: ${COLORS.purpleLight};
-        }
-
-        /* =====================================================
-           KPI GRID
-           ===================================================== */
-
-        .kpi-grid {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 16px;
-          margin-bottom: 24px;
-        }
-
-        .kpi-card {
-          position: relative;
-          background: ${COLORS.card};
-          border: 1px solid ${COLORS.border};
-          border-radius: 14px;
-          padding: 20px;
-          min-height: 135px;
-          overflow: hidden;
-        }
-
-        .kpi-card::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 4px;
-          background: ${COLORS.purple};
-        }
-
-        .kpi-card:nth-child(2)::before {
-          background: ${COLORS.green};
-        }
-
-        .kpi-card:nth-child(3)::before {
-          background: ${COLORS.green};
-        }
-
-        .kpi-card:nth-child(4)::before {
-          background: ${COLORS.green};
-        }
-
-        .kpi-card:nth-child(5)::before {
-          background: ${COLORS.purple};
-        }
-
-        .kpi-icon {
-          font-size: 23px;
-          margin-bottom: 12px;
-        }
-
-        .kpi-title {
-          color: ${COLORS.secondaryText};
-          font-size: 13px;
-          margin-bottom: 8px;
-        }
-
-        .kpi-value {
-          color: ${COLORS.text};
-          font-size: 25px;
-          font-weight: 700;
-        }
-
-        .kpi-subtitle {
-          margin-top: 7px;
-          color: ${COLORS.mutedText};
-          font-size: 12px;
-        }
-
-        /* =====================================================
-           CHART GRID
-           ===================================================== */
-
-        .chart-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 18px;
-          margin-bottom: 20px;
-        }
-
-        .chart-card {
-          background: ${COLORS.card};
-          border: 1px solid ${COLORS.border};
-          border-radius: 14px;
-          padding: 20px;
-        }
-
-        .chart-card h2 {
-          margin: 0 0 5px;
-          font-size: 18px;
-          color: ${COLORS.text};
-        }
-
-        .chart-card p {
-          margin: 0 0 15px;
-          color: ${COLORS.secondaryText};
-          font-size: 13px;
-        }
-
-        .full-chart {
-          margin-bottom: 20px;
-        }
-
-        /* =====================================================
-           RECHARTS
-           ===================================================== */
-
-        .recharts-cartesian-grid-horizontal line,
-        .recharts-cartesian-grid-vertical line {
-          stroke: ${COLORS.border};
-        }
-
-        .recharts-text {
-          fill: ${COLORS.secondaryText};
-        }
-
-        .recharts-legend-item-text {
-          color: ${COLORS.secondaryText} !important;
-        }
-
-        /* =====================================================
-           TOOLTIP
-           ===================================================== */
-
-        .recharts-default-tooltip {
-          background-color: ${COLORS.card} !important;
-          border: 1px solid ${COLORS.border} !important;
-        }
-
-        /* =====================================================
-           SUMMARY
-           ===================================================== */
-
-        .roi-summary {
-          background: ${COLORS.card};
-          border: 1px solid ${COLORS.border};
-          border-radius: 14px;
-          padding: 24px;
-          margin-bottom: 20px;
-        }
-
-        .summary-header h2 {
-          margin: 0 0 6px;
-          font-size: 20px;
-          color: ${COLORS.text};
-        }
-
-        .summary-header p {
-          margin: 0;
-          color: ${COLORS.secondaryText};
-          font-size: 13px;
-        }
-
-        .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 15px;
-          margin-top: 22px;
-        }
-
-        .summary-item {
-          padding: 18px;
-          background: ${COLORS.cardSecondary};
-          border: 1px solid ${COLORS.border};
-          border-radius: 10px;
-        }
-
-        .summary-item span {
-          display: block;
-          color: ${COLORS.secondaryText};
-          font-size: 13px;
-          margin-bottom: 8px;
-        }
-
-        .summary-item strong {
-          color: ${COLORS.text};
-          font-size: 21px;
-        }
-
-        /* =====================================================
-           CLOSED LOOP
-           ===================================================== */
-
-        .closed-loop {
-          background: ${COLORS.card};
-          border: 1px solid ${COLORS.border};
-          border-radius: 14px;
-          padding: 24px;
-        }
-
-        .closed-loop h2 {
-          margin: 0 0 22px;
-          font-size: 20px;
-          color: ${COLORS.text};
-        }
-
-        .loop {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-        }
-
-        .loop-step {
-          flex: 1;
-          text-align: center;
-          padding: 18px 10px;
-          border: 1px solid ${COLORS.border};
-          border-radius: 10px;
-          background: ${COLORS.cardSecondary};
-        }
-
-        .loop-number {
-          width: 38px;
-          height: 38px;
-          margin: 0 auto 10px;
-          border-radius: 50%;
-          background: ${COLORS.purple};
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-        }
-
-        .loop-step strong {
-          display: block;
-          margin-bottom: 5px;
-          color: ${COLORS.text};
-        }
-
-        .loop-step span {
-          color: ${COLORS.secondaryText};
-          font-size: 12px;
-        }
-
-        .loop-arrow {
-          font-size: 24px;
-          color: ${COLORS.purple};
-        }
-
-        /* =====================================================
-           RESPONSIVE
-           ===================================================== */
-
-        @media (max-width: 1100px) {
-
-          .kpi-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-
-        }
-
-        @media (max-width: 800px) {
-
-          .roi-header {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-
-          .roi-header-actions {
-            flex-wrap: wrap;
-          }
-
-          .chart-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .summary-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .loop {
-            flex-direction: column;
-          }
-
-          .loop-step {
-            width: 100%;
-          }
-
-          .loop-arrow {
-            transform: rotate(90deg);
-          }
-
-        }
-
-        @media (max-width: 600px) {
-
-          .roi-page {
-            padding: 16px;
-          }
-
-          .kpi-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .summary-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .roi-header-actions {
-            width: 100%;
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-        }
-
-      `}</style>
-
-      {/* =====================================================
+    <div
+      style={{
+        minHeight: "100vh",
+        background: COLORS.bg,
+        color: COLORS.text,
+        padding: "28px",
+        fontFamily:
+          "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      }}
+    >
+      {/* ====================================================
           HEADER
-          ===================================================== */}
+      ==================================================== */}
 
-      <div className="roi-header">
-
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 20,
+          marginBottom: 24,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-
-          <h1>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 28,
+              fontWeight: 750,
+            }}
+          >
             Decision ROI
           </h1>
 
-          <p>
-            Closed-loop performance and prescription impact
+          <p
+            style={{
+              margin: "8px 0 0",
+              color: COLORS.muted,
+              fontSize: 14,
+            }}
+          >
+            Measure cost savings, action success,
+            delivery performance and business impact.
           </p>
 
-        </div>
-
-        <div className="roi-header-actions">
-
-          <div className="roi-status">
-
-            <span className="status-dot"></span>
-
-            Analytics Active
-
-          </div>
-
-          <button
-            className="back-home-button"
-            onClick={() => navigate("/")}
+          <div
+            style={{
+              marginTop: 10,
+              color: error
+                ? COLORS.red
+                : COLORS.green,
+              fontSize: 12,
+            }}
           >
-            ← Back to Home
-          </button>
-
+            ●{" "}
+            {error
+              ? "ROI API unavailable"
+              : loading
+              ? "Loading analytics..."
+              : "Analytics loaded"}
+          </div>
         </div>
 
+        <button
+          onClick={loadData}
+          style={buttonStyle}
+        >
+          ↻ Refresh
+        </button>
       </div>
 
-      {/* =====================================================
-          KPI CARDS
-          ===================================================== */}
+      {/* ====================================================
+          ERROR
+      ==================================================== */}
 
-      <div className="kpi-grid">
-
-        <div className="kpi-card">
-
-          <div className="kpi-icon">
-            📦
-          </div>
-
-          <div className="kpi-title">
-            Total Decisions
-          </div>
-
-          <div className="kpi-value">
-            {totalDecisions}
-          </div>
-
-          <div className="kpi-subtitle">
-            Evaluated decisions
-          </div>
-
+      {error && (
+        <div
+          style={{
+            ...cardStyle,
+            padding: 14,
+            marginBottom: 14,
+            color: COLORS.red,
+            fontSize: 13,
+          }}
+        >
+          {error}
         </div>
+      )}
 
-        <div className="kpi-card">
+      {/* ====================================================
+          LOADING
+      ==================================================== */}
 
-          <div className="kpi-icon">
-            💰
-          </div>
-
-          <div className="kpi-title">
-            Cost Saving
-          </div>
-
-          <div className="kpi-value">
-            {currency(savings)}
-          </div>
-
-          <div className="kpi-subtitle">
-            Expected vs actual cost
-          </div>
-
+      {loading ? (
+        <div
+          style={{
+            ...cardStyle,
+            padding: 60,
+            textAlign: "center",
+            color: COLORS.muted,
+          }}
+        >
+          Loading ROI analytics...
         </div>
+      ) : (
+        <>
+          {/* ==================================================
+              KPI CARDS
+          ================================================== */}
 
-        <div className="kpi-card">
-
-          <div className="kpi-icon">
-            🚚
-          </div>
-
-          <div className="kpi-title">
-            On-Time Rate
-          </div>
-
-          <div className="kpi-value">
-            {onTimeRate.toFixed(1)}%
-          </div>
-
-          <div className="kpi-subtitle">
-            Delivery performance
-          </div>
-
-        </div>
-
-        <div className="kpi-card">
-
-          <div className="kpi-icon">
-            ✓
-          </div>
-
-          <div className="kpi-title">
-            Action Success
-          </div>
-
-          <div className="kpi-value">
-            {successRate.toFixed(1)}%
-          </div>
-
-          <div className="kpi-subtitle">
-            Successful prescriptions
-          </div>
-
-        </div>
-
-        <div className="kpi-card">
-
-          <div className="kpi-icon">
-            📈
-          </div>
-
-          <div className="kpi-title">
-            ROI
-          </div>
-
-          <div className="kpi-value">
-            {roiPercentage.toFixed(1)}%
-          </div>
-
-          <div className="kpi-subtitle">
-            Return on prescription
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* =====================================================
-          EXPECTED VS ACTUAL + DELIVERY
-          ===================================================== */}
-
-      <div className="chart-grid">
-
-        {/* COST */}
-
-        <div className="chart-card">
-
-          <h2>
-            Expected vs Actual Cost
-          </h2>
-
-          <p>
-            Cost impact after applying prescriptions
-          </p>
-
-          <ResponsiveContainer
-            width="100%"
-            height={300}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit,minmax(180px,1fr))",
+              gap: 16,
+              marginBottom: 22,
+            }}
           >
+            <MetricCard
+              title="Total Decisions"
+              value={formatNumber(
+                metrics.totalDecisions
+              )}
+              subtitle="Recorded decisions"
+              icon="◉"
+              accent={COLORS.blue}
+            />
 
-            <BarChart
-              data={[
-                {
-                  name: "Expected",
-                  cost: expectedCost,
-                },
-                {
-                  name: "Actual",
-                  cost: actualCost,
-                },
-              ]}
+            <MetricCard
+              title="Cost Savings"
+              value={formatMoney(
+                metrics.savings
+              )}
+              subtitle="Total savings"
+              icon="₹"
+              accent={COLORS.purple}
+            />
+
+            <MetricCard
+              title="On-Time Rate"
+              value={formatPercent(
+                metrics.onTimeRate
+              )}
+              subtitle="Delivery performance"
+              icon="✓"
+              accent={COLORS.green}
+            />
+
+            <MetricCard
+              title="Action Success"
+              value={formatPercent(
+                metrics.successRate
+              )}
+              subtitle="Successful actions"
+              icon="★"
+              accent={COLORS.yellow}
+            />
+
+            <MetricCard
+              title="ROI"
+              value={formatPercent(
+                metrics.roi
+              )}
+              subtitle="Return on investment"
+              icon="%"
+              accent={COLORS.cyan}
+            />
+          </div>
+
+          {/* ==================================================
+              EXPECTED VS ACTUAL + DELIVERY
+          ================================================== */}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit,minmax(320px,1fr))",
+              gap: 18,
+              marginBottom: 22,
+            }}
+          >
+            {/* =================================================
+                EXPECTED VS ACTUAL COST
+            ================================================= */}
+
+            <section
+              style={{
+                ...cardStyle,
+                padding: 20,
+                minHeight: 340,
+              }}
             >
+              <h2 style={sectionTitle}>
+                Expected vs Actual Cost
+              </h2>
 
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke={COLORS.border}
-              />
+              <p style={sectionSubtitle}>
+                Compare predicted cost with actual operational cost
+              </p>
 
-              <XAxis
-                dataKey="name"
-                stroke={COLORS.secondaryText}
-              />
-
-              <YAxis
-                stroke={COLORS.secondaryText}
-              />
-
-              <Tooltip
-                formatter={(value) =>
-                  currency(value)
-                }
-                contentStyle={{
-                  backgroundColor: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
-                  color: COLORS.text,
-                }}
-              />
-
-              <Legend />
-
-              <Bar
-                dataKey="cost"
-                name="Cost"
-                fill={COLORS.purple}
-                radius={[6, 6, 0, 0]}
-              />
-
-            </BarChart>
-
-          </ResponsiveContainer>
-
-        </div>
-
-        {/* DELIVERY */}
-
-        <div className="chart-card">
-
-          <h2>
-            Delivery Performance
-          </h2>
-
-          <p>
-            On-time vs delayed shipments
-          </p>
-
-          <ResponsiveContainer
-            width="100%"
-            height={300}
-          >
-
-            <PieChart>
-
-              <Pie
-                data={deliveryData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label
+              <ResponsiveContainer
+                width="100%"
+                height={270}
               >
+                <BarChart
+                  data={costData}
+                  margin={{
+                    top: 10,
+                    right: 10,
+                    left: 5,
+                    bottom: 10,
+                  }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={COLORS.border}
+                  />
 
-                {deliveryData.map(
-                  (entry, index) => (
+                  <XAxis
+                    dataKey="name"
+                    stroke={COLORS.muted}
+                    tick={{ fontSize: 10 }}
+                  />
+
+                  <YAxis
+                    stroke={COLORS.muted}
+                  />
+
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value) =>
+                      formatMoney(value)
+                    }
+                  />
+
+                  <Legend />
+
+                  {/* ==========================================
+                      EXPECTED = PINK
+                      ACTUAL = BLUE
+                  ========================================== */}
+
+                  <Bar
+                    dataKey="value"
+                    name="Cost"
+                    radius={[6, 6, 0, 0]}
+                  >
+                    <Cell
+                      fill={COLORS.expectedPink}
+                    />
 
                     <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        index === 0
-                          ? COLORS.green
-                          : COLORS.red
+                      fill={COLORS.actualBlue}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </section>
+
+            {/* =================================================
+                DELIVERY PERFORMANCE
+            ================================================= */}
+
+            <section
+              style={{
+                ...cardStyle,
+                padding: 20,
+                minHeight: 340,
+              }}
+            >
+              <h2 style={sectionTitle}>
+                Delivery Performance
+              </h2>
+
+              <p style={sectionSubtitle}>
+                On-time versus delayed deliveries
+              </p>
+
+              <ResponsiveContainer
+                width="100%"
+                height={270}
+              >
+                <PieChart>
+                  <Pie
+                    data={deliveryData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={95}
+                    paddingAngle={3}
+                  >
+                    <Cell
+                      fill={COLORS.green}
+                    />
+
+                    <Cell
+                      fill={COLORS.red}
+                    />
+                  </Pie>
+
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value) =>
+                      `${asNumber(value).toFixed(
+                        1
+                      )}%`
+                    }
+                  />
+
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </section>
+          </div>
+
+          {/* ==================================================
+              ACTION + MARKET
+          ================================================== */}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit,minmax(320px,1fr))",
+              gap: 18,
+              marginBottom: 22,
+            }}
+          >
+            {/* =================================================
+                PRESCRIPTION ACTION PERFORMANCE
+            ================================================= */}
+
+            <section
+              style={{
+                ...cardStyle,
+                padding: 20,
+                minHeight: 340,
+              }}
+            >
+              <h2 style={sectionTitle}>
+                Prescription Action Performance
+              </h2>
+
+              <p style={sectionSubtitle}>
+                Success rate of selected operational actions
+              </p>
+
+              {formattedActionData.length ? (
+                <ResponsiveContainer
+                  width="100%"
+                  height={270}
+                >
+                  <BarChart
+                    data={formattedActionData}
+                    margin={{
+                      top: 10,
+                      right: 10,
+                      left: 5,
+                      bottom: 10,
+                    }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={COLORS.border}
+                    />
+
+                    <XAxis
+                      dataKey="action"
+                      stroke={COLORS.muted}
+                      tick={{ fontSize: 10 }}
+                    />
+
+                    <YAxis
+                      stroke={COLORS.muted}
+                    />
+
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(value) =>
+                        `${asNumber(
+                          value
+                        ).toFixed(1)}%`
                       }
                     />
 
-                  )
+                    <Legend />
+
+                    <Bar
+                      dataKey="successRate"
+                      name="Success Rate (%)"
+                      radius={[
+                        6,
+                        6,
+                        0,
+                        0,
+                      ]}
+                    >
+                      {formattedActionData.map(
+                        (entry, index) => {
+                          const actionColors = [
+                            COLORS.actionBlue,
+                            COLORS.actionGreen,
+                            COLORS.actionPurple,
+                          ];
+
+                          return (
+                            <Cell
+                              key={`action-${index}`}
+                              fill={
+                                actionColors[
+                                  index %
+                                    actionColors.length
+                                ]
+                              }
+                            />
+                          );
+                        }
+                      )}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyChart />
+              )}
+            </section>
+
+            {/* =================================================
+                SAVINGS BY MARKET
+            ================================================= */}
+
+            <section
+              style={{
+                ...cardStyle,
+                padding: 20,
+                minHeight: 340,
+              }}
+            >
+              <h2 style={sectionTitle}>
+                Savings by Market
+              </h2>
+
+              <p style={sectionSubtitle}>
+                Total cost savings across markets
+              </p>
+
+              {formattedMarketData.length ? (
+                <ResponsiveContainer
+                  width="100%"
+                  height={270}
+                >
+                  <BarChart
+                    data={formattedMarketData}
+                    margin={{
+                      top: 10,
+                      right: 10,
+                      left: 5,
+                      bottom: 10,
+                    }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={COLORS.border}
+                    />
+
+                    <XAxis
+                      dataKey="market"
+                      stroke={COLORS.muted}
+                      tick={{ fontSize: 10 }}
+                    />
+
+                    <YAxis
+                      stroke={COLORS.muted}
+                    />
+
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(value) =>
+                        formatMoney(value)
+                      }
+                    />
+
+                    <Legend />
+
+                    <Bar
+                      dataKey="savings"
+                      name="Savings (₹)"
+                      fill={COLORS.purple}
+                      radius={[
+                        6,
+                        6,
+                        0,
+                        0,
+                      ]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyChart />
+              )}
+            </section>
+          </div>
+
+          {/* ==================================================
+              ROI SUMMARY
+          ================================================== */}
+
+          <section
+            style={{
+              ...cardStyle,
+              padding: 20,
+              marginBottom: 22,
+            }}
+          >
+            <h2 style={sectionTitle}>
+              ROI Summary
+            </h2>
+
+            <p style={sectionSubtitle}>
+              Financial impact generated by the
+              closed-loop decision process
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(180px,1fr))",
+                gap: 14,
+                marginTop: 18,
+              }}
+            >
+              <SummaryBox
+                title="Expected Cost"
+                value={formatMoney(
+                  metrics.expectedCost
                 )}
+                accent={COLORS.expectedPink}
+              />
 
-              </Pie>
+              <SummaryBox
+                title="Actual Cost"
+                value={formatMoney(
+                  metrics.actualCost
+                )}
+                accent={COLORS.actualBlue}
+              />
 
-              <Tooltip />
+              <SummaryBox
+                title="Total Saving"
+                value={formatMoney(
+                  metrics.savings
+                )}
+                accent={COLORS.green}
+              />
 
-              <Legend />
+              <SummaryBox
+                title="ROI"
+                value={formatPercent(
+                  metrics.roi
+                )}
+                accent={COLORS.cyan}
+              />
+            </div>
+          </section>
 
-            </PieChart>
+          {/* ==================================================
+              COST SAVING BY MARKET
+          ================================================== */}
 
-          </ResponsiveContainer>
-
-        </div>
-
-      </div>
-
-      {/* =====================================================
-          ACTION + MARKET
-          ===================================================== */}
-
-      <div className="chart-grid">
-
-        {/* ACTION PERFORMANCE */}
-
-        <div className="chart-card">
-
-          <h2>
-            Prescription Action Performance
-          </h2>
-
-          <p>
-            Success rate by selected action
-          </p>
-
-          <ResponsiveContainer
-            width="100%"
-            height={320}
+          <section
+            style={{
+              ...cardStyle,
+              padding: 20,
+              marginBottom: 22,
+              minHeight: 340,
+            }}
           >
+            <h2 style={sectionTitle}>
+              Cost Saving by Market
+            </h2>
 
-            <BarChart
-              data={formattedActionData}
+            <p style={sectionSubtitle}>
+              Savings distribution across markets
+            </p>
+
+            {formattedMarketData.length ? (
+              <ResponsiveContainer
+                width="100%"
+                height={270}
+              >
+                <LineChart
+                  data={formattedMarketData}
+                  margin={{
+                    top: 10,
+                    right: 10,
+                    left: 5,
+                    bottom: 10,
+                  }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={COLORS.border}
+                  />
+
+                  <XAxis
+                    dataKey="market"
+                    stroke={COLORS.muted}
+                  />
+
+                  <YAxis
+                    stroke={COLORS.muted}
+                  />
+
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value) =>
+                      formatMoney(value)
+                    }
+                  />
+
+                  <Legend />
+
+                  <Line
+                    type="monotone"
+                    dataKey="savings"
+                    name="Savings (₹)"
+                    stroke={COLORS.cyan}
+                    strokeWidth={2}
+                    dot={{
+                      r: 4,
+                      fill: COLORS.cyan,
+                    }}
+                    activeDot={{
+                      r: 6,
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChart />
+            )}
+          </section>
+
+          {/* ==================================================
+              CLOSED LOOP
+          ================================================== */}
+
+          <section
+            style={{
+              ...cardStyle,
+              padding: 20,
+            }}
+          >
+            <h2
+              style={{
+                margin: "0 0 8px",
+                fontSize: 15,
+              }}
             >
+              Closed-Loop Decision Intelligence
+            </h2>
 
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke={COLORS.border}
-              />
-
-              <XAxis
-                dataKey="action"
-                stroke={COLORS.secondaryText}
-              />
-
-              <YAxis
-                domain={[0, 100]}
-                stroke={COLORS.secondaryText}
-              />
-
-              <Tooltip
-                formatter={(value) =>
-                  `${number(value).toFixed(1)}%`
-                }
-                contentStyle={{
-                  backgroundColor: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
-                  color: COLORS.text,
-                }}
-              />
-
-              <Bar
-                dataKey="successRate"
-                name="Success Rate (%)"
-                fill={COLORS.green}
-                radius={[6, 6, 0, 0]}
-              />
-
-            </BarChart>
-
-          </ResponsiveContainer>
-
-        </div>
-
-        {/* MARKET */}
-
-        <div className="chart-card">
-
-          <h2>
-            Savings by Market
-          </h2>
-
-          <p>
-            Cost saving generated across markets
-          </p>
-
-          <ResponsiveContainer
-            width="100%"
-            height={320}
-          >
-
-            <BarChart
-              data={formattedMarketData}
+            <p
+              style={{
+                margin: 0,
+                color: COLORS.muted,
+                fontSize: 13,
+                lineHeight: 1.7,
+              }}
             >
+              Prediction → Prescription → Decision →
+              Outcome → ROI. Decision ROI measures the
+              financial and operational impact generated
+              by the closed-loop supply-chain process.
+            </p>
 
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke={COLORS.border}
-              />
-
-              <XAxis
-                dataKey="market"
-                angle={-15}
-                textAnchor="end"
-                height={70}
-                stroke={COLORS.secondaryText}
-              />
-
-              <YAxis
-                stroke={COLORS.secondaryText}
-              />
-
-              <Tooltip
-                formatter={(value) =>
-                  currency(value)
-                }
-                contentStyle={{
-                  backgroundColor: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
-                  color: COLORS.text,
-                }}
-              />
-
-              <Bar
-                dataKey="savings"
-                name="Savings (₹)"
-                fill={COLORS.purple}
-                radius={[6, 6, 0, 0]}
-              />
-
-            </BarChart>
-
-          </ResponsiveContainer>
-
-        </div>
-
-      </div>
-
-      {/* =====================================================
-          MARKET ANALYTICS
-          ===================================================== */}
-
-      <div className="chart-card full-chart">
-
-        <h2>
-          Cost Saving by Market
-        </h2>
-
-        <p>
-          Prescription impact across markets
-        </p>
-
-        <ResponsiveContainer
-          width="100%"
-          height={320}
-        >
-
-          <LineChart
-            data={formattedMarketData}
-          >
-
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke={COLORS.border}
-            />
-
-            <XAxis
-              dataKey="market"
-              stroke={COLORS.secondaryText}
-            />
-
-            <YAxis
-              stroke={COLORS.secondaryText}
-            />
-
-            <Tooltip
-              formatter={(value) =>
-                currency(value)
-              }
-              contentStyle={{
-                backgroundColor: COLORS.card,
-                border: `1px solid ${COLORS.border}`,
-                color: COLORS.text,
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                marginTop: 18,
               }}
-            />
+            >
+              <FlowStep
+                text="Prediction"
+                color={COLORS.blue}
+              />
 
-            <Legend />
+              <FlowArrow />
 
-            <Line
-              type="monotone"
-              dataKey="savings"
-              name="Cost Saving (₹)"
-              stroke={COLORS.purple}
-              strokeWidth={3}
-              dot={{
-                r: 4,
-                fill: COLORS.purple,
-              }}
-              activeDot={{
-                r: 6,
-              }}
-            />
+              <FlowStep
+                text="Prescription"
+                color={COLORS.purple}
+              />
 
-          </LineChart>
+              <FlowArrow />
 
-        </ResponsiveContainer>
+              <FlowStep
+                text="Decision"
+                color={COLORS.yellow}
+              />
 
-      </div>
+              <FlowArrow />
 
-      {/* =====================================================
-          ROI SUMMARY
-          ===================================================== */}
+              <FlowStep
+                text="Outcome"
+                color={COLORS.green}
+              />
 
-      <div className="roi-summary">
+              <FlowArrow />
 
-        <div className="summary-header">
-
-          <h2>
-            ROI Summary
-          </h2>
-
-          <p>
-            Overall impact of supply-chain prescriptions
-          </p>
-
-        </div>
-
-        <div className="summary-grid">
-
-          <div className="summary-item">
-
-            <span>
-              Expected Cost
-            </span>
-
-            <strong>
-              {currency(expectedCost)}
-            </strong>
-
-          </div>
-
-          <div className="summary-item">
-
-            <span>
-              Actual Cost
-            </span>
-
-            <strong>
-              {currency(actualCost)}
-            </strong>
-
-          </div>
-
-          <div className="summary-item">
-
-            <span>
-              Total Saving
-            </span>
-
-            <strong>
-              {currency(savings)}
-            </strong>
-
-          </div>
-
-          <div className="summary-item">
-
-            <span>
-              ROI
-            </span>
-
-            <strong>
-              {roiPercentage.toFixed(2)}%
-            </strong>
-
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* =====================================================
-          CLOSED LOOP
-          ===================================================== */}
-
-      <div className="closed-loop">
-
-        <h2>
-          Closed-Loop Decision Process
-        </h2>
-
-        <div className="loop">
-
-          <div className="loop-step">
-
-            <div className="loop-number">
-              1
+              <FlowStep
+                text="ROI"
+                color={COLORS.cyan}
+              />
             </div>
-
-            <strong>
-              Prediction
-            </strong>
-
-            <span>
-              Risk is identified
-            </span>
-
-          </div>
-
-          <div className="loop-arrow">
-            →
-          </div>
-
-          <div className="loop-step">
-
-            <div className="loop-number">
-              2
-            </div>
-
-            <strong>
-              Recommendation
-            </strong>
-
-            <span>
-              Best action prescribed
-            </span>
-
-          </div>
-
-          <div className="loop-arrow">
-            →
-          </div>
-
-          <div className="loop-step">
-
-            <div className="loop-number">
-              3
-            </div>
-
-            <strong>
-              Decision
-            </strong>
-
-            <span>
-              Manager selects action
-            </span>
-
-          </div>
-
-          <div className="loop-arrow">
-            →
-          </div>
-
-          <div className="loop-step">
-
-            <div className="loop-number">
-              4
-            </div>
-
-            <strong>
-              Outcome
-            </strong>
-
-            <span>
-              Actual result recorded
-            </span>
-
-          </div>
-
-          <div className="loop-arrow">
-            →
-          </div>
-
-          <div className="loop-step">
-
-            <div className="loop-number">
-              5
-            </div>
-
-            <strong>
-              Learning
-            </strong>
-
-            <span>
-              System improves
-            </span>
-
-          </div>
-
-        </div>
-
-      </div>
-
+          </section>
+        </>
+      )}
     </div>
   );
 }
 
-export default DecisionROI;
+// ============================================================
+// METRIC CARD
+// ============================================================
+
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  accent,
+}) {
+  return (
+    <div
+      style={{
+        ...cardStyle,
+        padding: 19,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: 3,
+          height: "100%",
+          background: accent,
+        }}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              color: COLORS.muted,
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: 0.6,
+              marginBottom: 9,
+            }}
+          >
+            {title}
+          </div>
+
+          <div
+            style={{
+              fontSize: 25,
+              fontWeight: 750,
+            }}
+          >
+            {value}
+          </div>
+
+          <div
+            style={{
+              color: COLORS.muted,
+              fontSize: 11,
+              marginTop: 7,
+            }}
+          >
+            {subtitle}
+          </div>
+        </div>
+
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            flexShrink: 0,
+            borderRadius: 9,
+            background: `${accent}18`,
+            color: accent,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 800,
+          }}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SUMMARY BOX
+// ============================================================
+
+function SummaryBox({
+  title,
+  value,
+  accent,
+}) {
+  return (
+    <div
+      style={{
+        background: COLORS.panel2,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 10,
+        padding: 16,
+        borderLeft: `3px solid ${accent}`,
+      }}
+    >
+      <div
+        style={{
+          color: COLORS.muted,
+          fontSize: 11,
+          marginBottom: 8,
+        }}
+      >
+        {title}
+      </div>
+
+      <div
+        style={{
+          fontSize: 21,
+          fontWeight: 700,
+          color: accent,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// FLOW STEP
+// ============================================================
+
+function FlowStep({
+  text,
+  color,
+}) {
+  return (
+    <div
+      style={{
+        padding: "9px 14px",
+        borderRadius: 8,
+        background: `${color}15`,
+        border: `1px solid ${color}40`,
+        color: color,
+        fontSize: 12,
+        fontWeight: 700,
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+// ============================================================
+// FLOW ARROW
+// ============================================================
+
+function FlowArrow() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        color: COLORS.muted,
+      }}
+    >
+      →
+    </div>
+  );
+}
+
+// ============================================================
+// EMPTY CHART
+// ============================================================
+
+function EmptyChart() {
+  return (
+    <div
+      style={{
+        height: 270,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: COLORS.muted,
+        fontSize: 13,
+      }}
+    >
+      No chart data available
+    </div>
+  );
+}
