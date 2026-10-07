@@ -180,6 +180,7 @@ function LearningPerformance() {
         <MiniTrendChart data={accuracyTrend} />
       </div>
 
+
       {/* Before/After Comparison */}
       {beforeAfter && (
         <div className="bg-gray-800 rounded-xl p-6">
