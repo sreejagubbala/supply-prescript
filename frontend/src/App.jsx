@@ -8,7 +8,7 @@ import Suppliers from './pages/Suppliers'
 import Analytics from './pages/Analytics'
 import DecisionROI from './pages/DecisionROI'
 import DecisionHistory from './pages/DecisionHistory'
-import LearningPerformance from './pages/LearningPerformance'
+//import LearningPerformance from './pages/LearningPerformance'
 
 
 function App() {
@@ -27,7 +27,7 @@ function App() {
             <Route path="/decision-roi" element={<DecisionROI />} />
             <Route path="/decision-history" element={<DecisionHistory />} />
             <Route path="/shipments/:shipmentId" element={<DisruptionDetails />} />
-            <Route path="/learning-performance" element={<LearningPerformance />} />
+            {/* <Route path="/learning-performance" element={<LearningPerformance />} /> */}
           </Routes>
         </div>
       </div>
