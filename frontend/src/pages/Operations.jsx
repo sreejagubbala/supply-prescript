@@ -14,29 +14,11 @@ import {
   YAxis,
 } from "recharts";
 
-<<<<<<< HEAD
-// Mock data — will be replaced with real API data on Day 7
-const mockKpis = [
-  { label: 'Total Shipments', value: 128, icon: Truck, color: 'purple' },
-  { label: 'On-Time', value: 96, icon: CheckCircle, color: 'green' },
-  { label: 'Delayed', value: 32, icon: AlertTriangle, color: 'red' },
-]
-const mockTrendData = [
-  { day: 'Mon', delays: 4 },
-  { day: 'Tue', delays: 7 },
-  { day: 'Wed', delays: 3 },
-  { day: 'Thu', delays: 9 },
-  { day: 'Fri', delays: 5 },
-  { day: 'Sat', delays: 2 },
-  { day: 'Sun', delays: 6 },
-]
-=======
 // ============================================================
 // API
 // ============================================================
 
 const API_BASE_URL = "http://127.0.0.1:8000";
->>>>>>> origin/main
 
 // ============================================================
 // COLORS
